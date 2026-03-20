@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect, useRef } from 'react';
 import { FormInput, FormSelect, FormSwitch } from '../../components/ui';
 import { applyCorsProxy } from '../../hooks/useEvents';

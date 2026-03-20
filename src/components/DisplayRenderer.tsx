@@ -1,3 +1,4 @@
+'use client';
 /**
  * DisplayRenderer — The main component for rendering a campus-hub display.
  *

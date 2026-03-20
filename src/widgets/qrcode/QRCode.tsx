@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect } from 'react';
 import QRCodeLib from 'qrcode';
 import { WidgetComponentProps, registerWidget } from '../../lib/widget-registry';

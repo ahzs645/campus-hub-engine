@@ -1,3 +1,4 @@
+'use client';
 import { useEffect, useRef, useState } from 'react';
 import { FormInput, FormSelect, FormSwitch } from '../../components/ui';
 import { buildProxyUrl } from '../../lib/data-cache';

@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect } from 'react';
 import { FormInput } from '../../components/ui';
 import type { WidgetOptionsProps } from '../../lib/widget-registry';

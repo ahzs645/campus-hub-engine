@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { FormInput, FormSelect } from '../../components/ui';
 import { getAllWidgets, getWidget } from '../../lib/widget-registry';

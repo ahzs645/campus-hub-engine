@@ -52,3 +52,6 @@ import './home-assistant/HomeAssistant';
 
 // Re-export registry functions
 export { getWidget, getAllWidgets, getWidgetComponent } from '../lib/widget-registry';
+
+// Re-export widget-specific exports used by consumers
+export { MODES as NOTHING_GLYPH_MODES } from './nothing-glyph/NothingGlyph';

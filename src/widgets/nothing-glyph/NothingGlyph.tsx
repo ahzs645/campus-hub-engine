@@ -1,3 +1,4 @@
+'use client';
 import { useEffect, useRef } from 'react';
 import { WidgetComponentProps, registerWidget } from '../../lib/widget-registry';
 import { MatrixLayout } from './matrix/MatrixLayout';

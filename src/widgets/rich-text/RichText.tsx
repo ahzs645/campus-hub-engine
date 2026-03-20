@@ -1,3 +1,4 @@
+'use client';
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { WidgetComponentProps, registerWidget } from '../../lib/widget-registry';
 import RichTextOptions from './RichTextOptions';

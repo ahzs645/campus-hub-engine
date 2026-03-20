@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { usePixelDisplay } from 'react-pixel-display';
 import { WidgetComponentProps, registerWidget } from '../../lib/widget-registry';

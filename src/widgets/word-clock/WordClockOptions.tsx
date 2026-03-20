@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect } from 'react';
 import { FormSwitch } from '../../components/ui';
 import type { WidgetOptionsProps } from '../../lib/widget-registry';

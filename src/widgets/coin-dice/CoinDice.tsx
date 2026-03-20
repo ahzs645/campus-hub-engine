@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { WidgetComponentProps, registerWidget } from '../../lib/widget-registry';
 import { useAdaptiveFitScale } from '../../hooks/useFitScale';

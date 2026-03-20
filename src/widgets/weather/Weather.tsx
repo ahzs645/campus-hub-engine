@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { WidgetComponentProps, registerWidget } from '../../lib/widget-registry';
 import { buildCacheKey, buildProxyUrl, fetchJsonWithCache, fetchTextWithCache } from '../../lib/data-cache';

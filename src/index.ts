@@ -3,7 +3,7 @@ export { DisplayRenderer } from './components/DisplayRenderer';
 export { Configurator } from './components/Configurator';
 export { default as WidgetRenderer } from './components/WidgetRenderer';
 export { default as WidgetEditDialog } from './components/WidgetEditDialog';
-export { default as GridStackWrapper } from './components/GridStackWrapper';
+export { default as GridStackWrapper, type GridStackItem, type GridStackWrapperRef } from './components/GridStackWrapper';
 export { default as AppIcon } from './components/AppIcon';
 
 // === Widget Registry ===
@@ -21,10 +21,6 @@ export {
 export {
   DEFAULT_CONFIG,
   normalizeConfig,
-  encodeConfig,
-  decodeConfig,
-  generateShareUrl,
-  generateSharePath,
   isWidgetInBounds,
   filterInBoundsLayout,
   type DisplayConfig,

@@ -1,3 +1,4 @@
+'use client';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildProxyUrl } from '../../lib/data-cache';
 import { registerWidget, WidgetComponentProps } from '../../lib/widget-registry';

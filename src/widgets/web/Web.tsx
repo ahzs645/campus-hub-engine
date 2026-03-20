@@ -1,3 +1,4 @@
+'use client';
 import { useEffect, useState } from 'react';
 import { WidgetComponentProps, registerWidget } from '../../lib/widget-registry';
 import AppIcon from '../../components/AppIcon';

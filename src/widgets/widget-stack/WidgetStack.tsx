@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { DISPLAY_WIDGET_COMPONENTS, preloadDisplayWidgetComponent } from '../../lib/display-widget-components';
 import { WidgetComponentProps, registerWidget } from '../../lib/widget-registry';

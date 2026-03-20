@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect } from 'react';
 import { FormInput, FormSwitch } from '../../components/ui';
 import AppIcon from '../../components/AppIcon';

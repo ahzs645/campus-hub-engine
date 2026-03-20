@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect } from 'react';
 import { buildCacheKey, buildProxyUrl, fetchJsonWithCache, fetchTextWithCache } from '../lib/data-cache';
 import { parseICal, parseRss } from '../lib/feeds';

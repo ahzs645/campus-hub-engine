@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { registerWidget, type WidgetComponentProps } from '../../lib/widget-registry';
 import { createSignalingClient, type SignalingClient } from '../../lib/signaling-client';

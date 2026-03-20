@@ -1,3 +1,4 @@
+'use client';
 import { useRef, useEffect, forwardRef, useImperativeHandle, ReactNode } from 'react';
 import type { CSSProperties } from 'react';
 import { GridStack, GridStackNode, GridItemHTMLElement } from 'gridstack';

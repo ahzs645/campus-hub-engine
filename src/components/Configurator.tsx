@@ -1,3 +1,4 @@
+'use client';
 /**
  * Configurator — Embeddable drag-and-drop layout editor.
  *

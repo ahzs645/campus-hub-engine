@@ -1,5 +1,4 @@
-// Configuration encoding/decoding utilities for URL-based config
-import createWebShareEngine from '@firstform/json-url/web-share';
+// Configuration types and pure utilities (no Node.js dependencies)
 
 export interface WidgetConfig {
   id: string;
@@ -54,17 +53,6 @@ export interface DisplayConfig {
 
 export type ShareUrlMode = 'fullscreen' | 'edit';
 
-const configCodec = createWebShareEngine<DisplayConfig>({
-  maxLength: 100_000,
-});
-
-const legacyLzConfigCodec = createWebShareEngine<DisplayConfig>({
-  codecs: ['lz'],
-  defaultCodec: 'lz',
-  alwaysPrefix: false,
-  maxLength: 100_000,
-});
-
 export const DEFAULT_CONFIG: DisplayConfig = {
   layout: [
     { id: 'clock-1', type: 'clock', x: 10, y: 0, w: 2, h: 1 },
@@ -83,11 +71,7 @@ export const DEFAULT_CONFIG: DisplayConfig = {
   corsProxy: '',
 };
 
-// Base path is no longer used - site runs at root domain
-export const getBasePath = (): string => '';
-
-/** Strip defunct third-party CORS proxy URLs from per-widget props so old
- *  cached configs don't keep hitting dead proxies. */
+/** Strip defunct third-party CORS proxy URLs from per-widget props. */
 const DEFUNCT_PROXIES = ['corsproxy.io', 'cors.lol', 'allorigins.win'];
 const PROXY_KEYS = ['corsProxy', 'eventCorsProxy'];
 
@@ -159,54 +143,6 @@ export function normalizeConfig(raw: Partial<DisplayConfig> | null | undefined):
   };
 }
 
-const decodeBase64Url = (encoded: string): string | null => {
-  try {
-    let base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
-    while (base64.length % 4) {
-      base64 += '=';
-    }
-    if (typeof Buffer !== 'undefined') {
-      return Buffer.from(base64, 'base64').toString('utf-8');
-    }
-    if (typeof atob !== 'undefined') {
-      const binary = atob(base64);
-      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-      return new TextDecoder().decode(bytes);
-    }
-    return null;
-  } catch {
-    return null;
-  }
-};
-
-export async function encodeConfig(config: DisplayConfig): Promise<string> {
-  try {
-    return await configCodec.compress(config);
-  } catch {
-    return '';
-  }
-}
-
-export async function decodeConfig(encoded: string): Promise<DisplayConfig | null> {
-  try {
-    const decoded = await configCodec.decompress(encoded, { deURI: true });
-    return normalizeConfig(decoded);
-  } catch {
-    try {
-      const decoded = await legacyLzConfigCodec.decompress(encoded, { deURI: true });
-      return normalizeConfig(decoded);
-    } catch {
-      try {
-        const json = decodeBase64Url(encoded);
-        if (!json) return null;
-        return normalizeConfig(JSON.parse(json) as DisplayConfig);
-      } catch {
-        return null;
-      }
-    }
-  }
-}
-
 /** Check whether a widget fits entirely within the grid bounds. */
 export function isWidgetInBounds(
   widget: WidgetConfig,
@@ -231,25 +167,4 @@ export function filterInBoundsLayout(config: DisplayConfig): DisplayConfig {
     layout,
     tickerEnabled: layout.some((w) => w.type === 'news-ticker'),
   };
-}
-
-export async function generateSharePath(
-  config: DisplayConfig,
-  mode: ShareUrlMode = 'fullscreen',
-): Promise<string> {
-  const exported = filterInBoundsLayout(config);
-  const encoded = await encodeConfig(exported);
-  const basePath = getBasePath();
-  const path = mode === 'edit' ? '/configure' : '/display';
-  return `${basePath}${path}?config=${encoded}`;
-}
-
-// Generate a shareable URL with the config
-export async function generateShareUrl(
-  config: DisplayConfig,
-  origin: string,
-  mode: ShareUrlMode = 'fullscreen',
-): Promise<string> {
-  const sharePath = await generateSharePath(config, mode);
-  return `${origin}${sharePath}`;
 }
