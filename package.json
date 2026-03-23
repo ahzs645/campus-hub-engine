@@ -1,5 +1,5 @@
 {
-  "name": "@campus-hub/engine",
+  "name": "@firstform/campus-hub-engine",
   "version": "0.1.0",
   "description": "Campus Hub widget engine — display renderer, configurator, and 48+ widgets",
   "type": "module",
