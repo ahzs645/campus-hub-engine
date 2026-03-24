@@ -71,26 +71,28 @@ export default function WidgetEditDialog({
   return (
     <dialog
       ref={dialogRef}
-      className="backdrop:bg-[var(--ui-overlay)] bg-transparent fixed inset-0 m-0 p-4 w-full h-full max-w-none max-h-none flex items-center justify-center"
+      className="backdrop:bg-black/50 bg-transparent fixed inset-0 m-0 p-4 w-full h-full max-w-none max-h-none flex items-center justify-center"
       onClick={handleBackdropClick}
     >
-      <div className="bg-[var(--ui-panel-solid)] border border-[color:var(--ui-panel-border)] rounded-xl shadow-2xl flex flex-col w-full max-w-2xl max-h-[90vh] text-white">
+      <div
+        className="widget-edit-dialog bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-2xl flex flex-col w-full max-w-2xl max-h-[90vh] text-gray-900 dark:text-white"
+      >
         {/* Header */}
-        <div className="flex-shrink-0 px-6 py-4 border-b border-[color:var(--ui-panel-border)]">
+        <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-gray-800">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <AppIcon name={widgetDef.icon} className="w-7 h-7 text-[var(--ui-text)]" />
+              <AppIcon name={widgetDef.icon} className="w-7 h-7 text-gray-900 dark:text-white" />
               <div>
-                <h2 className="text-xl font-bold text-[var(--ui-text)]">Configure {widgetDef.name}</h2>
-                <p className="text-sm text-[var(--ui-text-muted)]">{widgetDef.description}</p>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Configure {widgetDef.name}</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{widgetDef.description}</p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-[var(--ui-item-hover)] rounded-lg transition-colors"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
               aria-label="Close"
             >
-              <svg className="w-5 h-5 text-[var(--ui-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
@@ -100,10 +102,10 @@ export default function WidgetEditDialog({
         {/* Content - Scrollable */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Coming Soon Toggle */}
-          <div className="flex items-center justify-between p-3 rounded-lg bg-[var(--ui-panel-soft)] border border-[color:var(--ui-panel-border)]">
+          <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <div>
-              <div className="text-sm font-medium text-[var(--ui-text)]">Coming Soon</div>
-              <div className="text-xs text-[var(--ui-text-muted)]">Gray out this widget with a &quot;Coming Soon&quot; overlay</div>
+              <div className="text-sm font-medium text-gray-900 dark:text-white">Coming Soon</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Gray out this widget with a &quot;Coming Soon&quot; overlay</div>
             </div>
             <button
               type="button"
@@ -111,7 +113,7 @@ export default function WidgetEditDialog({
               aria-checked={comingSoon}
               onClick={() => setComingSoon(!comingSoon)}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${
-                comingSoon ? 'bg-[var(--ui-switch-on)]' : 'bg-[var(--ui-switch-off)]'
+                comingSoon ? 'bg-emerald-600' : 'bg-gray-300 dark:bg-gray-600'
               }`}
             >
               <span
@@ -125,24 +127,24 @@ export default function WidgetEditDialog({
           {OptionsComponent ? (
             <OptionsComponent data={data} onChange={handleChange} />
           ) : (
-            <div className="text-center py-8 text-[var(--ui-text-muted)]">
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               <p>No additional configuration options available for this widget.</p>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex-shrink-0 px-6 py-4 border-t border-[color:var(--ui-panel-border)] bg-[var(--ui-panel-soft)] rounded-b-xl">
+        <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 rounded-b-xl">
           <div className="flex justify-end gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-[var(--ui-text)] hover:bg-[var(--ui-item-hover)] rounded-lg transition-colors"
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-2 bg-[var(--ui-switch-on)] text-[var(--color-primary)] hover:brightness-110 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-500 rounded-lg transition-colors"
             >
               Save Changes
             </button>
