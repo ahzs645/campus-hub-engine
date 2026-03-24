@@ -16,13 +16,10 @@
 import { useCallback, useState, useRef, useEffect } from 'react';
 import type { DisplayConfig, WidgetConfig } from '../lib/config';
 import { normalizeConfig, DEFAULT_CONFIG } from '../lib/config';
-import { getAllWidgets, getWidget } from '../lib/widget-registry';
+import { getAllWidgets, getWidget } from '@firstform/campus-hub-widget-sdk';
 import WidgetRenderer from './WidgetRenderer';
 import WidgetEditDialog from './WidgetEditDialog';
 import type { GridStackWrapperRef } from './GridStackWrapper';
-
-// Ensure widgets are registered
-import '../widgets/index';
 
 interface ConfiguratorProps {
   /** Initial config to load */

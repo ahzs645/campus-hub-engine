@@ -4,18 +4,44 @@ export { Configurator } from './components/Configurator';
 export { default as WidgetRenderer } from './components/WidgetRenderer';
 export { default as WidgetEditDialog } from './components/WidgetEditDialog';
 export { default as GridStackWrapper, type GridStackItem, type GridStackWrapperRef } from './components/GridStackWrapper';
-export { default as AppIcon } from './components/AppIcon';
 
-// === Widget Registry ===
+// === Re-export SDK (backward compatibility) ===
 export {
+  // Widget Registry
   registerWidget,
   getWidget,
   getAllWidgets,
   getWidgetComponent,
+  registerWidgetLoader,
+  getWidgetLoader,
+  getAllWidgetLoaders,
   type WidgetDefinition,
   type WidgetComponentProps,
   type WidgetOptionsProps,
-} from './lib/widget-registry';
+  // Data Utilities
+  fetchJsonWithCache,
+  fetchTextWithCache,
+  buildCacheKey,
+  buildProxyUrl,
+  isEntryFresh,
+  // Feeds
+  parseICal,
+  parseRss,
+  // Hooks
+  useFitScale,
+  useAdaptiveFitScale,
+  useEvents,
+  type CalendarEvent,
+  type UseEventsOptions,
+  // Icon Names
+  type IconName,
+  // Components
+  AppIcon,
+  FormInput,
+  FormSelect,
+  FormSwitch,
+  FormStepper,
+} from '@firstform/campus-hub-widget-sdk';
 
 // === Config Types & Utilities ===
 export {
@@ -29,16 +55,10 @@ export {
   type ShareUrlMode,
 } from './lib/config';
 
-// === Data Utilities ===
 export {
-  fetchJsonWithCache,
-  fetchTextWithCache,
-  buildCacheKey,
-  buildProxyUrl,
-  isEntryFresh,
-} from './lib/data-cache';
-
-export { parseICal, parseRss } from './lib/feeds';
+  buildConfigThumbnailSvg,
+  generateConfigThumbnailDataUri,
+} from './lib/config-thumbnail';
 
 // === Display Widget Components (lazy loaded) ===
 export {
@@ -46,22 +66,5 @@ export {
   preloadDisplayWidgetComponent,
 } from './lib/display-widget-components';
 
-// === Hooks ===
-export { useFitScale, useAdaptiveFitScale } from './hooks/useFitScale';
-export { useEvents, type CalendarEvent, type UseEventsOptions } from './hooks/useEvents';
-
 // === Widget Tags ===
 export { getWidgetTags, ALL_TAGS, WIDGET_TAGS } from './lib/widget-tags';
-
-// === Icon Names ===
-export type { IconName } from './lib/icon-names';
-
-// === UI Form Components ===
-export { default as FormInput } from './components/ui/FormInput';
-export { default as FormSelect } from './components/ui/FormSelect';
-export { default as FormSwitch } from './components/ui/FormSwitch';
-export { default as FormStepper } from './components/ui/FormStepper';
-
-// === Side-effect: Register all widgets ===
-// Import this to ensure all widgets are registered in the registry
-export * as widgetRegistration from './widgets/index';
