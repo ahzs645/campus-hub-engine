@@ -166,7 +166,7 @@ export function Configurator({
                     <WidgetRenderer
                       widget={widget}
                       theme={config.theme}
-                      corsProxy={config.corsProxy}
+
                     />
                   </div>
                   {/* Remove button */}
