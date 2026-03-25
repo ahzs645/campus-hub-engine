@@ -43,6 +43,10 @@ export function DisplayRenderer({
   const gridRows = config.gridRows ?? 8;
   const aspectRatio = config.aspectRatio ?? 16 / 9;
 
+  // Derive actual design dimensions from the aspect ratio
+  const actualDesignWidth = designWidth;
+  const actualDesignHeight = Math.round(designWidth / aspectRatio);
+
   // Responsive scaling
   useEffect(() => {
     const container = containerRef.current;
@@ -51,8 +55,8 @@ export function DisplayRenderer({
     const update = () => {
       const rect = container.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) return;
-      const scaleX = rect.width / designWidth;
-      const scaleY = rect.height / designHeight;
+      const scaleX = rect.width / actualDesignWidth;
+      const scaleY = rect.height / actualDesignHeight;
       setScale(Math.min(scaleX, scaleY));
     };
 
@@ -60,10 +64,10 @@ export function DisplayRenderer({
     const observer = new ResizeObserver(update);
     observer.observe(container);
     return () => observer.disconnect();
-  }, [designWidth, designHeight]);
+  }, [actualDesignWidth, actualDesignHeight]);
 
-  const cellWidth = designWidth / gridCols;
-  const cellHeight = designHeight / gridRows;
+  const cellWidth = actualDesignWidth / gridCols;
+  const cellHeight = actualDesignHeight / gridRows;
 
   return (
     <div
@@ -82,8 +86,8 @@ export function DisplayRenderer({
     >
       <div
         style={{
-          width: designWidth,
-          height: designHeight,
+          width: actualDesignWidth,
+          height: actualDesignHeight,
           transform: `scale(${scale})`,
           transformOrigin: 'center center',
           flexShrink: 0,
