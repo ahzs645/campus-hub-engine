@@ -75,6 +75,9 @@ export function DisplayRenderer({
         height: '100%',
         overflow: 'hidden',
         backgroundColor: config.theme.background,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
       }}
     >
       <div
@@ -82,7 +85,8 @@ export function DisplayRenderer({
           width: designWidth,
           height: designHeight,
           transform: `scale(${scale})`,
-          transformOrigin: 'top left',
+          transformOrigin: 'center center',
+          flexShrink: 0,
         }}
       >
         {config.layout.map((widget: WidgetConfig) => (
