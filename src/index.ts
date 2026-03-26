@@ -43,6 +43,9 @@ export {
   FormStepper,
 } from '@firstform/campus-hub-widget-sdk';
 
+// === Theme Context ===
+export { EngineThemeProvider, useEngineTheme, type EngineTheme } from './lib/ThemeContext';
+
 // === Config Types & Utilities ===
 export {
   DEFAULT_CONFIG,

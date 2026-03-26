@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getWidget, AppIcon } from '@firstform/campus-hub-widget-sdk';
 import type { SourceBinding } from '@firstform/campus-hub-widget-sdk';
+import { useEngineTheme } from '../lib/ThemeContext';
 
 export interface ContentSource {
   _id: string;
@@ -22,6 +23,8 @@ interface WidgetEditDialogProps {
   onClose: () => void;
   /** Optional: available content sources for the source picker */
   sources?: ContentSource[];
+  /** @deprecated Use EngineThemeProvider instead */
+  accentColor?: string;
 }
 
 export default function WidgetEditDialog({
@@ -33,7 +36,10 @@ export default function WidgetEditDialog({
   onSave,
   onClose,
   sources,
+  accentColor: accentColorProp,
 }: WidgetEditDialogProps) {
+  const theme = useEngineTheme();
+  const accentColor = accentColorProp || theme.accent;
   const [data, setData] = useState<Record<string, unknown>>(initialData);
   const [comingSoon, setComingSoon] = useState(initialComingSoon);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -88,24 +94,25 @@ export default function WidgetEditDialog({
       onClick={handleBackdropClick}
     >
       <div
-        className="widget-edit-dialog bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-2xl flex flex-col w-full max-w-2xl max-h-[90vh] text-gray-900 dark:text-white"
+        className="widget-edit-dialog rounded-xl shadow-2xl flex flex-col w-full max-w-2xl max-h-[90vh]"
+        style={{ '--dialog-accent': accentColor, '--ui-switch-on': accentColor, '--ui-switch-off': 'rgba(156,163,175,0.4)', backgroundColor: '#111827', color: '#fff', borderWidth: '1px', borderColor: '#1f2937', colorScheme: 'dark' } as React.CSSProperties}
       >
         {/* Header */}
-        <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+        <div className="flex-shrink-0 px-6 py-4 border-b border-gray-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <AppIcon name={widgetDef.icon} className="w-7 h-7 text-gray-900 dark:text-white" />
+              <AppIcon name={widgetDef.icon} className="w-7 h-7 text-white" />
               <div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Configure {widgetDef.name}</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{widgetDef.description}</p>
+                <h2 className="text-xl font-bold text-white">Configure {widgetDef.name}</h2>
+                <p className="text-sm text-gray-400">{widgetDef.description}</p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
               aria-label="Close"
             >
-              <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
@@ -115,18 +122,19 @@ export default function WidgetEditDialog({
         {/* Content - Scrollable */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Coming Soon Toggle */}
-          <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800 border border-gray-700">
             <div>
-              <div className="text-sm font-medium text-gray-900 dark:text-white">Coming Soon</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Gray out this widget with a &quot;Coming Soon&quot; overlay</div>
+              <div className="text-sm font-medium text-white">Coming Soon</div>
+              <div className="text-xs text-gray-400">Gray out this widget with a &quot;Coming Soon&quot; overlay</div>
             </div>
             <button
               type="button"
               role="switch"
               aria-checked={comingSoon}
               onClick={() => setComingSoon(!comingSoon)}
+              style={comingSoon ? { backgroundColor: accentColor } : undefined}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${
-                comingSoon ? 'bg-emerald-600' : 'bg-gray-300 dark:bg-gray-600'
+                comingSoon ? '' : 'bg-gray-600'
               }`}
             >
               <span
@@ -144,30 +152,32 @@ export default function WidgetEditDialog({
               sources={sources}
               data={data}
               onChange={handleChange}
+              accentColor={accentColor}
             />
           )}
 
           {OptionsComponent ? (
             <OptionsComponent data={data} onChange={handleChange} />
           ) : (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            <div className="text-center py-8 text-gray-400">
               <p>No additional configuration options available for this widget.</p>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 rounded-b-xl">
+        <div className="flex-shrink-0 px-6 py-4 border-t border-gray-700 bg-gray-800/50 rounded-b-xl">
           <div className="flex justify-end gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-500 rounded-lg transition-colors"
+              style={{ backgroundColor: accentColor }}
+              className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors hover:opacity-90"
             >
               Save Changes
             </button>
@@ -184,11 +194,13 @@ function SourcePicker({
   sources,
   data,
   onChange,
+  accentColor = '#10b981',
 }: {
   bindings: SourceBinding[];
   sources: ContentSource[];
   data: Record<string, unknown>;
   onChange: (newData: Record<string, unknown>) => void;
+  accentColor?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -220,19 +232,19 @@ function SourcePicker({
   if (matchingSources.length === 0) return null;
 
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 overflow-hidden">
+    <div className="rounded-lg border border-gray-700 bg-gray-800 overflow-hidden">
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between px-4 py-3 text-left"
       >
         <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" style={{ color: accentColor }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
           </svg>
-          <span className="text-sm font-medium text-gray-900 dark:text-white">Content Source</span>
+          <span className="text-sm font-medium text-white">Content Source</span>
           {linkedSource && (
-            <span className="px-2 py-0.5 rounded-full text-xs bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400">
+            <span className="px-2 py-0.5 rounded-full text-xs" style={{ backgroundColor: `${accentColor}20`, color: accentColor }}>
               {linkedSource.name}
             </span>
           )}
@@ -246,20 +258,20 @@ function SourcePicker({
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 space-y-2 border-t border-gray-200 dark:border-gray-700 pt-3">
+        <div className="px-4 pb-4 space-y-2 border-t border-gray-700 pt-3">
           <p className="text-xs text-gray-500 mb-2">
             Pick a source from your library to link to this widget. The URL will stay in sync when you update the source.
           </p>
 
           {linkedSource && (
-            <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30">
+            <div className="flex items-center justify-between p-2 rounded-lg border" style={{ backgroundColor: `${accentColor}10`, borderColor: `${accentColor}30` }}>
               <div className="min-w-0">
-                <div className="text-sm font-medium text-emerald-800 dark:text-emerald-300 truncate">{linkedSource.name}</div>
-                <div className="text-xs text-emerald-600 dark:text-emerald-400 truncate">{linkedSource.url}</div>
+                <div className="text-sm font-medium truncate" style={{ color: accentColor }}>{linkedSource.name}</div>
+                <div className="text-xs truncate" style={{ color: `${accentColor}cc` }}>{linkedSource.url}</div>
               </div>
               <button
                 onClick={handleUnlink}
-                className="ml-2 px-2 py-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-500/10 rounded transition-colors flex-shrink-0"
+                className="ml-2 px-2 py-1 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors flex-shrink-0"
               >
                 Unlink
               </button>
@@ -276,13 +288,14 @@ function SourcePicker({
                     if (!isLinked) handlePickSource(bindings[0], source);
                   }}
                   disabled={isLinked}
+                  style={isLinked ? { backgroundColor: `${accentColor}10` } : undefined}
                   className={`w-full text-left p-2 rounded-lg flex items-center gap-3 transition-colors ${
                     isLinked
-                      ? 'bg-emerald-50 dark:bg-emerald-500/10 cursor-default'
-                      : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                      ? 'cursor-default'
+                      : 'hover:bg-gray-700'
                   }`}
                 >
-                  <div className="w-8 h-8 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  <div className="w-8 h-8 rounded bg-gray-700 flex items-center justify-center flex-shrink-0 overflow-hidden">
                     {source.sourceType === 'image' ? (
                       <img src={source.url} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -290,11 +303,11 @@ function SourcePicker({
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{source.name}</div>
+                    <div className="text-sm font-medium text-white truncate">{source.name}</div>
                     <div className="text-xs text-gray-400 truncate">{source.url}</div>
                   </div>
                   {isLinked && (
-                    <span className="text-xs text-emerald-600 flex-shrink-0">Linked</span>
+                    <span className="text-xs flex-shrink-0" style={{ color: accentColor }}>Linked</span>
                   )}
                 </button>
               );

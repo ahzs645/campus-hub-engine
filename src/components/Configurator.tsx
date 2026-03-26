@@ -16,6 +16,7 @@
 import { useCallback, useState, useRef, useEffect } from 'react';
 import type { DisplayConfig, WidgetConfig } from '../lib/config';
 import { normalizeConfig, DEFAULT_CONFIG } from '../lib/config';
+import { EngineThemeProvider } from '../lib/ThemeContext';
 import { getAllWidgets, getWidget } from '@firstform/campus-hub-widget-sdk';
 import WidgetRenderer from './WidgetRenderer';
 import WidgetEditDialog from './WidgetEditDialog';
@@ -118,6 +119,7 @@ export function Configurator({
     : null;
 
   return (
+    <EngineThemeProvider theme={config.theme}>
     <div className={`flex h-full ${className ?? ''}`}>
       {/* Widget palette */}
       <div className="w-64 bg-gray-900 border-r border-gray-800 overflow-y-auto p-4 shrink-0">
@@ -199,5 +201,6 @@ export function Configurator({
         />
       )}
     </div>
+    </EngineThemeProvider>
   );
 }
