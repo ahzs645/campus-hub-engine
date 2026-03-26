@@ -46,6 +46,9 @@ export const WIDGET_TAGS: Record<string, string[]> = {
   'widget-stack':         ['Utility'],
   'google-calendar':      ['Campus', 'Time'],
   'home-assistant':       ['Utility', 'Info'],
+  'wifi-share':           ['Utility'],
+  'google-sheets':        ['Media'],
+  'canva':                ['Media'],
 };
 
 export function getWidgetTags(type: string): string[] {
