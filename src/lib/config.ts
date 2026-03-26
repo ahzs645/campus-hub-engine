@@ -48,6 +48,7 @@ export interface DisplayConfig {
   gridCols?: number;
   logo?: LogoConfig;
   aspectRatio?: number;
+  corsProxy?: string;
 }
 
 export type ShareUrlMode = 'fullscreen' | 'edit';
