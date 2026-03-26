@@ -47,6 +47,7 @@ export const WIDGET_TAGS: Record<string, string[]> = {
   'google-calendar':      ['Campus', 'Time'],
   'home-assistant':       ['Utility', 'Info'],
   'wifi-share':           ['Utility'],
+  'calendar':             ['Campus', 'Time'],
   'google-sheets':        ['Media'],
   'canva':                ['Media'],
 };
