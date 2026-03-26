@@ -1,6 +1,16 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getWidget, AppIcon } from '@firstform/campus-hub-widget-sdk';
+import type { SourceBinding } from '@firstform/campus-hub-widget-sdk';
+
+export interface ContentSource {
+  _id: string;
+  name: string;
+  url: string;
+  sourceType: string;
+  description?: string;
+  metadata?: { provider?: string };
+}
 
 interface WidgetEditDialogProps {
   isOpen: boolean;
@@ -10,6 +20,8 @@ interface WidgetEditDialogProps {
   comingSoon?: boolean;
   onSave: (widgetId: string, data: Record<string, unknown>, comingSoon: boolean) => void;
   onClose: () => void;
+  /** Optional: available content sources for the source picker */
+  sources?: ContentSource[];
 }
 
 export default function WidgetEditDialog({
@@ -20,6 +32,7 @@ export default function WidgetEditDialog({
   comingSoon: initialComingSoon = false,
   onSave,
   onClose,
+  sources,
 }: WidgetEditDialogProps) {
   const [data, setData] = useState<Record<string, unknown>>(initialData);
   const [comingSoon, setComingSoon] = useState(initialComingSoon);
@@ -124,6 +137,16 @@ export default function WidgetEditDialog({
             </button>
           </div>
 
+          {/* Source Picker — shown when sources are available and widget accepts them */}
+          {sources && sources.length > 0 && widgetDef.acceptsSources && widgetDef.acceptsSources.length > 0 && (
+            <SourcePicker
+              bindings={widgetDef.acceptsSources}
+              sources={sources}
+              data={data}
+              onChange={handleChange}
+            />
+          )}
+
           {OptionsComponent ? (
             <OptionsComponent data={data} onChange={handleChange} />
           ) : (
@@ -152,5 +175,133 @@ export default function WidgetEditDialog({
         </div>
       </div>
     </dialog>
+  );
+}
+
+/** Source picker panel shown above widget options when sources are available */
+function SourcePicker({
+  bindings,
+  sources,
+  data,
+  onChange,
+}: {
+  bindings: SourceBinding[];
+  sources: ContentSource[];
+  data: Record<string, unknown>;
+  onChange: (newData: Record<string, unknown>) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  // Get current source ref if any
+  const sourceRef = data.__sourceRef as { sourceId?: string; propName?: string } | undefined;
+  const linkedSource = sourceRef?.sourceId
+    ? sources.find((s) => s._id === sourceRef.sourceId)
+    : undefined;
+
+  const handlePickSource = (binding: SourceBinding, source: ContentSource) => {
+    const newData = {
+      ...data,
+      [binding.propName]: source.url,
+      __sourceRef: { sourceId: source._id, propName: binding.propName },
+    };
+    onChange(newData);
+    setExpanded(false);
+  };
+
+  const handleUnlink = () => {
+    const { __sourceRef, ...rest } = data;
+    onChange(rest);
+  };
+
+  // Filter sources to only show types this widget accepts
+  const acceptedTypes = new Set(bindings.flatMap((b) => b.types));
+  const matchingSources = sources.filter((s) => acceptedTypes.has(s.sourceType as any));
+
+  if (matchingSources.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+          </svg>
+          <span className="text-sm font-medium text-gray-900 dark:text-white">Content Source</span>
+          {linkedSource && (
+            <span className="px-2 py-0.5 rounded-full text-xs bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400">
+              {linkedSource.name}
+            </span>
+          )}
+        </div>
+        <svg
+          className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-2 border-t border-gray-200 dark:border-gray-700 pt-3">
+          <p className="text-xs text-gray-500 mb-2">
+            Pick a source from your library to link to this widget. The URL will stay in sync when you update the source.
+          </p>
+
+          {linkedSource && (
+            <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30">
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-emerald-800 dark:text-emerald-300 truncate">{linkedSource.name}</div>
+                <div className="text-xs text-emerald-600 dark:text-emerald-400 truncate">{linkedSource.url}</div>
+              </div>
+              <button
+                onClick={handleUnlink}
+                className="ml-2 px-2 py-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-500/10 rounded transition-colors flex-shrink-0"
+              >
+                Unlink
+              </button>
+            </div>
+          )}
+
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {matchingSources.map((source) => {
+              const isLinked = sourceRef?.sourceId === source._id;
+              return (
+                <button
+                  key={source._id}
+                  onClick={() => {
+                    if (!isLinked) handlePickSource(bindings[0], source);
+                  }}
+                  disabled={isLinked}
+                  className={`w-full text-left p-2 rounded-lg flex items-center gap-3 transition-colors ${
+                    isLinked
+                      ? 'bg-emerald-50 dark:bg-emerald-500/10 cursor-default'
+                      : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <div className="w-8 h-8 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {source.sourceType === 'image' ? (
+                      <img src={source.url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-[10px] font-medium text-gray-500 uppercase">{source.sourceType.slice(0, 3)}</span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{source.name}</div>
+                    <div className="text-xs text-gray-400 truncate">{source.url}</div>
+                  </div>
+                  {isLinked && (
+                    <span className="text-xs text-emerald-600 flex-shrink-0">Linked</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

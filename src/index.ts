@@ -2,7 +2,7 @@
 export { DisplayRenderer } from './components/DisplayRenderer';
 export { Configurator } from './components/Configurator';
 export { default as WidgetRenderer } from './components/WidgetRenderer';
-export { default as WidgetEditDialog } from './components/WidgetEditDialog';
+export { default as WidgetEditDialog, type ContentSource } from './components/WidgetEditDialog';
 export { default as GridStackWrapper, type GridStackItem, type GridStackWrapperRef } from './components/GridStackWrapper';
 
 // === Re-export SDK (backward compatibility) ===
