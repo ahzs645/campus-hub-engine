@@ -96,14 +96,14 @@ export default function WidgetEditDialog({
       onClick={handleBackdropClick}
     >
       <div
-        className="widget-edit-dialog rounded-xl shadow-2xl flex flex-col w-full max-w-2xl max-h-[90vh] border border-[color:var(--ui-panel-border)] bg-[var(--ui-panel-soft,theme(colors.white))] text-[var(--ui-text)]"
+        className="widget-edit-dialog rounded-xl shadow-2xl flex flex-col w-full max-w-2xl max-h-[90vh] border border-[color:var(--ui-panel-border)] bg-[var(--ui-panel-solid,theme(colors.white))] text-[var(--ui-text)]"
         style={accentOverride}
       >
         {/* Header */}
         <div className="flex-shrink-0 px-6 py-4 border-b border-[color:var(--ui-panel-border)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <AppIcon name={widgetDef.icon} className="w-7 h-7 text-[var(--ui-text)]" />
+              <AppIcon name={widgetDef.icon} className="w-7 h-7 text-[var(--color-accent)]" />
               <div>
                 <h2 className="text-xl font-bold text-[var(--ui-text)]">Configure {widgetDef.name}</h2>
                 <p className="text-sm text-[var(--ui-text-muted)]">{widgetDef.description}</p>
