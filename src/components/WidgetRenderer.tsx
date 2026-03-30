@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { DISPLAY_WIDGET_COMPONENTS } from '../lib/display-widget-components';
 import type { WidgetConfig } from '../lib/config';
 
@@ -26,7 +27,7 @@ export default function WidgetRenderer({ widget, theme, corsProxy }: WidgetRende
   }
 
   return (
-    <div className="h-full w-full relative">
+    <div className="h-full w-full relative" style={{ '--widget-theme-tint': `${theme.primary}18` } as CSSProperties}>
       <div className={widget.comingSoon ? 'h-full w-full blur-sm grayscale pointer-events-none select-none' : 'h-full w-full'}>
         <Component config={widget.props} theme={theme} corsProxy={corsProxy} />
       </div>
