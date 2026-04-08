@@ -207,9 +207,12 @@ function SourcePicker({
     : undefined;
 
   const handlePickSource = (binding: SourceBinding, source: ContentSource) => {
+    const mappedData = binding.applySource
+      ? binding.applySource(source as any, data)
+      : { [binding.propName]: source.url };
     const newData = {
       ...data,
-      [binding.propName]: source.url,
+      ...mappedData,
       __sourceRef: { sourceId: source._id, propName: binding.propName },
     };
     onChange(newData);
