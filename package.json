@@ -29,7 +29,8 @@
     "gridstack": { "optional": true }
   },
   "dependencies": {
-    "@firstform/campus-hub-widget-sdk": "^0.1.0"
+    "@firstform/campus-hub-widget-sdk": "^0.1.0",
+    "@firstform/campus-hub-widgets-macos": "^0.1.0"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",

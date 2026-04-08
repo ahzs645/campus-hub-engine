@@ -3,6 +3,7 @@ import { useRef, useEffect, forwardRef, useImperativeHandle, ReactNode } from 'r
 import type { CSSProperties } from 'react';
 import { GridStack, GridStackNode, GridItemHTMLElement } from 'gridstack';
 import 'gridstack/dist/gridstack.min.css';
+import { GridderGridStackEngine } from './GridderGridStackEngine';
 
 export interface GridStackItem {
   id: string;
@@ -27,12 +28,23 @@ interface GridStackWrapperProps {
   cellHeight?: number | string;
   margin?: number;
   contentScale?: number;
+  swapMode?: 'default' | 'gridder';
   onLayoutChange?: (items: GridStackItem[]) => void;
   renderItem: (item: GridStackItem) => ReactNode;
 }
 
 const GridStackWrapper = forwardRef<GridStackWrapperRef, GridStackWrapperProps>(
-  ({ items, columns = 12, rows = 8, cellHeight = 'auto', margin = 8, contentScale, onLayoutChange, renderItem }, ref) => {
+  ({
+    items,
+    columns = 12,
+    rows = 8,
+    cellHeight = 'auto',
+    margin = 8,
+    contentScale,
+    swapMode = 'default',
+    onLayoutChange,
+    renderItem,
+  }, ref) => {
     const gridRef = useRef<HTMLDivElement>(null);
     const gridInstanceRef = useRef<GridStack | null>(null);
     const onLayoutChangeRef = useRef(onLayoutChange);
@@ -56,6 +68,7 @@ const GridStackWrapper = forwardRef<GridStackWrapperRef, GridStackWrapperProps>(
           cellHeight,
           margin,
           float: true, // Allow widgets to float (not stack)
+          engineClass: swapMode === 'gridder' ? GridderGridStackEngine : undefined,
           animate: true,
           draggable: {
             handle: '.gs-drag-handle',
@@ -107,7 +120,7 @@ const GridStackWrapper = forwardRef<GridStackWrapperRef, GridStackWrapperProps>(
         grid.destroy(false);
         gridInstanceRef.current = null;
       };
-    }, [columns, rows, cellHeight, margin]);
+    }, [columns, rows, cellHeight, margin, swapMode]);
 
     // Sync widgets with GridStack when items change (add/remove/update)
     useEffect(() => {
