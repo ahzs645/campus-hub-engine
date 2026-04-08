@@ -225,8 +225,12 @@ function SourcePicker({
   };
 
   // Filter sources to only show types this widget accepts
-  const acceptedTypes = new Set(bindings.flatMap((b) => b.types));
-  const matchingSources = sources.filter((s) => acceptedTypes.has(s.sourceType as any));
+  const matchingSources = sources.filter((source) =>
+    bindings.some((binding) =>
+      binding.types.includes(source.sourceType as any) &&
+      (!binding.matchSource || binding.matchSource(source as any))
+    )
+  );
 
   if (matchingSources.length === 0) return null;
 
@@ -280,11 +284,15 @@ function SourcePicker({
           <div className="max-h-48 overflow-y-auto space-y-1">
             {matchingSources.map((source) => {
               const isLinked = sourceRef?.sourceId === source._id;
+              const matchingBinding = bindings.find((binding) =>
+                binding.types.includes(source.sourceType as any) &&
+                (!binding.matchSource || binding.matchSource(source as any))
+              ) ?? bindings[0];
               return (
                 <button
                   key={source._id}
                   onClick={() => {
-                    if (!isLinked) handlePickSource(bindings[0], source);
+                    if (!isLinked) handlePickSource(matchingBinding, source);
                   }}
                   disabled={isLinked}
                   className={`w-full text-left p-2 rounded-lg flex items-center gap-3 transition-colors ${
