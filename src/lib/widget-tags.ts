@@ -46,6 +46,7 @@ export const WIDGET_TAGS: Record<string, string[]> = {
   'coin-dice':            ['Fun'],
   'word-of-the-day':      ['Fun'],
   'flashcard':            ['Fun'],
+  'audience-response':    ['Fun', 'Campus'],
   'qrcode':               ['Utility'],
   'widget-stack':         ['Utility'],
   'google-calendar':      ['Campus', 'Time'],

@@ -4,6 +4,7 @@ import type { CSSProperties } from 'react';
 import { GridStack, GridStackNode, GridItemHTMLElement } from 'gridstack';
 import 'gridstack/dist/gridstack.min.css';
 import { GridderGridStackEngine } from './GridderGridStackEngine';
+import { getContentScaleStyle } from '../lib/display-preview';
 
 export interface GridStackItem {
   id: string;
@@ -235,12 +236,7 @@ const GridStackWrapper = forwardRef<GridStackWrapperRef, GridStackWrapperProps>(
               <div className="grid-stack-item-content">
                 {contentScale && contentScale !== 1 ? (
                   <div
-                    style={{
-                      transform: `scale(${contentScale})`,
-                      transformOrigin: 'top left',
-                      width: `${100 / contentScale}%`,
-                      height: `${100 / contentScale}%`,
-                    }}
+                    style={getContentScaleStyle(contentScale)}
                   >
                     {renderItem(item)}
                   </div>

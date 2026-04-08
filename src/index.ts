@@ -12,6 +12,7 @@ export {
   getWidget,
   getAllWidgets,
   getWidgetComponent,
+  buildWidgetInitialProps,
   registerWidgetLoader,
   getWidgetLoader,
   getAllWidgetLoaders,
@@ -62,6 +63,18 @@ export {
   buildConfigThumbnailSvg,
   generateConfigThumbnailDataUri,
 } from './lib/config-thumbnail';
+export {
+  DEFAULT_DISPLAY_ASPECT_RATIO,
+  DEFAULT_DISPLAY_GRID_COLS,
+  DEFAULT_DISPLAY_GRID_ROWS,
+  DISPLAY_REFERENCE_HEIGHT,
+  getContentScaleStyle,
+  resolveDisplayPreviewMetrics,
+  resolveDisplayPreviewMetricsForCellHeight,
+  type DisplayPreviewMetrics,
+  type DisplayPreviewMetricsForCellHeightInput,
+  type DisplayPreviewMetricsInput,
+} from './lib/display-preview';
 
 // === Display Widget Components (lazy loaded) ===
 export {

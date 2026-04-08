@@ -17,7 +17,11 @@ import { useCallback, useState, useRef, useEffect } from 'react';
 import type { DisplayConfig, WidgetConfig } from '../lib/config';
 import { normalizeConfig, DEFAULT_CONFIG } from '../lib/config';
 import { EngineThemeProvider } from '../lib/ThemeContext';
-import { getAllWidgets, getWidget } from '@firstform/campus-hub-widget-sdk';
+import {
+  buildWidgetInitialProps,
+  getAllWidgets,
+  getWidget,
+} from '@firstform/campus-hub-widget-sdk';
 import WidgetRenderer from './WidgetRenderer';
 import WidgetEditDialog from './WidgetEditDialog';
 import type { GridStackWrapperRef } from './GridStackWrapper';
@@ -76,12 +80,12 @@ export function Configurator({
       const id = `${type}-${Date.now()}`;
       const newWidget: WidgetConfig = {
         id,
-        type: type as WidgetConfig['type'],
+        type,
         x: 0,
         y: 0,
         w: def.defaultW,
         h: def.defaultH,
-        props: def.defaultProps ?? {},
+        props: buildWidgetInitialProps(def),
       };
       setConfig((prev) => ({
         ...prev,
