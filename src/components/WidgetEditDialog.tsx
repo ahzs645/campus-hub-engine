@@ -9,7 +9,7 @@ export interface ContentSource {
   url: string;
   sourceType: string;
   description?: string;
-  metadata?: { provider?: string };
+  metadata?: { provider?: string; thumbnailUrl?: string };
 }
 
 interface WidgetEditDialogProps {
@@ -302,6 +302,8 @@ function SourcePicker({
                   <div className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0 overflow-hidden bg-[var(--ui-item-bg)]">
                     {source.sourceType === 'image' ? (
                       <img src={source.url} alt="" className="w-full h-full object-cover" />
+                    ) : source.metadata?.thumbnailUrl ? (
+                      <img src={source.metadata.thumbnailUrl} alt="" className="w-full h-full object-cover" />
                     ) : (
                       <span className="text-[10px] font-medium uppercase text-[var(--ui-text-muted)]">{source.sourceType.slice(0, 3)}</span>
                     )}

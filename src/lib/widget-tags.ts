@@ -35,6 +35,7 @@ export const WIDGET_TAGS: Record<string, string[]> = {
   'slideshow':            ['Media'],
   'image':                ['Media'],
   'media-player':         ['Media'],
+  'radio-station':        ['Media', 'Info'],
   'youtube':              ['Media'],
   'web':                  ['Media'],
   'rich-text':            ['Media'],
