@@ -9,10 +9,12 @@
  *   import { DisplayRenderer } from '@campus-hub/engine'
  *   <DisplayRenderer config={config} />
  */
-import { useMemo, useRef, useEffect, useState } from 'react';
+import { useMemo, useRef, useEffect, useLayoutEffect, useState } from 'react';
 import type { DisplayConfig, WidgetConfig } from '../lib/config';
 import { normalizeConfig, DEFAULT_CONFIG } from '../lib/config';
 import WidgetRenderer from './WidgetRenderer';
+
+const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 interface DisplayRendererProps {
   /** The display configuration to render */
@@ -32,7 +34,7 @@ export function DisplayRenderer({
   designHeight = 1080,
 }: DisplayRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  const [scale, setScale] = useState<number | null>(null);
 
   const config = useMemo(
     () => (rawConfig ? normalizeConfig(rawConfig) : DEFAULT_CONFIG),
@@ -47,8 +49,8 @@ export function DisplayRenderer({
   const actualDesignWidth = designWidth;
   const actualDesignHeight = Math.round(designWidth / aspectRatio);
 
-  // Responsive scaling
-  useEffect(() => {
+  // Responsive scaling — measure before paint to avoid a 1:1 → scaled flash
+  useIsoLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
@@ -88,9 +90,10 @@ export function DisplayRenderer({
         style={{
           width: actualDesignWidth,
           height: actualDesignHeight,
-          transform: `scale(${scale})`,
+          transform: `scale(${scale ?? 0})`,
           transformOrigin: 'center center',
           flexShrink: 0,
+          visibility: scale === null ? 'hidden' : 'visible',
         }}
       >
         {config.layout.map((widget: WidgetConfig) => (
