@@ -11,6 +11,12 @@ type InternalGridStackEngine = GridStackEngine & {
   _notify(removedNodes?: GridStackNode[]): GridStackEngine
 }
 
+type InternalGridStackNode = GridStackNode & {
+  _id?: number
+  _dirty?: boolean
+  _moving?: boolean
+}
+
 function snapshotSlot(node: GridStackNode): GridSlot {
   return {
     x: node.x ?? 0,
@@ -37,7 +43,9 @@ export class GridderGridStackEngine extends GridStackEngine {
   }
 
   override swap(a: GridStackNode, b: GridStackNode) {
-    if (!a || !b || a._id === b._id || a.locked || b.locked) {
+    const internalA = a as InternalGridStackNode
+    const internalB = b as InternalGridStackNode
+    if (!a || !b || internalA._id === internalB._id || a.locked || b.locked) {
       return false
     }
 
@@ -50,14 +58,15 @@ export class GridderGridStackEngine extends GridStackEngine {
 
     applySlot(a, bSlot)
     applySlot(b, aSlot)
-    a._dirty = true
-    b._dirty = true
+    internalA._dirty = true
+    internalB._dirty = true
 
     return true
   }
 
   private trySwapIntoCollision(node: GridStackNode, move: GridStackMoveOpts) {
-    if (move.resizing || !node._moving || move.nested) {
+    const internalNode = node as InternalGridStackNode
+    if (move.resizing || !internalNode._moving || move.nested) {
       return false
     }
 
@@ -78,7 +87,7 @@ export class GridderGridStackEngine extends GridStackEngine {
       return false
     }
 
-    ;(this as InternalGridStackEngine)._notify()
+    ;(this as unknown as InternalGridStackEngine)._notify()
     return true
   }
 
