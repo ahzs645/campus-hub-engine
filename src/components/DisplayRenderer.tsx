@@ -56,16 +56,40 @@ export function DisplayRenderer({
 
     const update = () => {
       const rect = container.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return;
-      const scaleX = rect.width / actualDesignWidth;
-      const scaleY = rect.height / actualDesignHeight;
-      setScale(Math.min(scaleX, scaleY));
+      let width = rect.width;
+      let height = rect.height;
+
+      if ((width <= 0 || height <= 0) && container.parentElement) {
+        const parentRect = container.parentElement.getBoundingClientRect();
+        width = width > 0 ? width : parentRect.width;
+        height = height > 0 ? height : parentRect.height;
+      }
+
+      if (width <= 0 || height <= 0) return;
+
+      const scaleX = width / actualDesignWidth;
+      const scaleY = height / actualDesignHeight;
+      const nextScale = Math.min(scaleX, scaleY);
+      setScale((currentScale) =>
+        currentScale !== null && Math.abs(currentScale - nextScale) < 0.0001
+          ? currentScale
+          : nextScale
+      );
     };
 
     update();
     const observer = new ResizeObserver(update);
     observer.observe(container);
-    return () => observer.disconnect();
+    if (container.parentElement) {
+      observer.observe(container.parentElement);
+    }
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
+    };
   }, [actualDesignWidth, actualDesignHeight]);
 
   const cellWidth = actualDesignWidth / gridCols;
@@ -79,6 +103,9 @@ export function DisplayRenderer({
         position: 'relative',
         width: '100%',
         height: '100%',
+        minWidth: 0,
+        minHeight: 0,
+        aspectRatio,
         overflow: 'hidden',
         backgroundColor: config.theme.background,
         display: 'flex',
@@ -88,6 +115,7 @@ export function DisplayRenderer({
     >
       <div
         style={{
+          position: 'relative',
           width: actualDesignWidth,
           height: actualDesignHeight,
           transform: `scale(${scale ?? 0})`,
