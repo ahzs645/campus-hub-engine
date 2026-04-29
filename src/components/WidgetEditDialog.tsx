@@ -12,7 +12,7 @@ export interface ContentSource {
   metadata?: { provider?: string; thumbnailUrl?: string };
 }
 
-interface WidgetEditDialogProps {
+export interface WidgetEditDialogProps {
   isOpen: boolean;
   widgetId: string;
   widgetType: string;
@@ -26,6 +26,8 @@ interface WidgetEditDialogProps {
   accentColor?: string;
 }
 
+export type WidgetEditPanelProps = Omit<WidgetEditDialogProps, 'isOpen'>;
+
 export default function WidgetEditDialog({
   isOpen,
   widgetId,
@@ -37,6 +39,38 @@ export default function WidgetEditDialog({
   sources,
   accentColor,
 }: WidgetEditDialogProps) {
+  if (!isOpen) return null;
+
+  return (
+    <WidgetEditForm
+      widgetId={widgetId}
+      widgetType={widgetType}
+      initialData={initialData}
+      comingSoon={initialComingSoon}
+      sources={sources}
+      accentColor={accentColor}
+      onSave={onSave}
+      onClose={onClose}
+      presentation="dialog"
+    />
+  );
+}
+
+export function WidgetEditPanel(props: WidgetEditPanelProps) {
+  return <WidgetEditForm {...props} presentation="panel" />;
+}
+
+function WidgetEditForm({
+  widgetId,
+  widgetType,
+  initialData,
+  comingSoon: initialComingSoon = false,
+  onSave,
+  onClose,
+  sources,
+  accentColor,
+  presentation,
+}: WidgetEditPanelProps & { presentation: 'dialog' | 'panel' }) {
   const [data, setData] = useState<Record<string, unknown>>(initialData);
   const [comingSoon, setComingSoon] = useState(initialComingSoon);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -44,25 +78,27 @@ export default function WidgetEditDialog({
   const widgetDef = getWidget(widgetType);
   const OptionsComponent = widgetDef?.OptionsComponent;
 
-  // Sync initial data when dialog opens
+  const isDialog = presentation === 'dialog';
+
+  // Sync initial data when the edited widget changes.
   useEffect(() => {
-    if (isOpen) {
-      setData(initialData);
-      setComingSoon(initialComingSoon);
-    }
-  }, [isOpen, initialData, initialComingSoon]);
+    setData(initialData);
+    setComingSoon(initialComingSoon);
+  }, [widgetId, initialData, initialComingSoon]);
 
   // Control dialog open/close
   useEffect(() => {
+    if (!isDialog) return;
+
     const dialog = dialogRef.current;
     if (!dialog) return;
 
-    if (isOpen) {
-      dialog.showModal();
-    } else {
+    dialog.showModal();
+
+    return () => {
       dialog.close();
-    }
-  }, [isOpen]);
+    };
+  }, [isDialog]);
 
   const handleChange = useCallback((newData: Record<string, unknown>) => {
     setData(newData);
@@ -89,99 +125,116 @@ export default function WidgetEditDialog({
     ? { '--color-accent': accentColor, '--ui-switch-on': accentColor } as React.CSSProperties
     : undefined;
 
+  const content = (
+    <div
+      className={
+        isDialog
+          ? 'widget-edit-dialog rounded-xl shadow-2xl flex flex-col w-full max-w-2xl max-h-[90vh] border border-[color:var(--ui-panel-border)] bg-[var(--ui-panel-solid,theme(colors.white))] text-[var(--ui-text)]'
+          : 'widget-edit-dialog flex h-full min-h-0 flex-col border-l border-[color:var(--ui-panel-border)] bg-[var(--ui-panel-solid,theme(colors.white))] text-[var(--ui-text)]'
+      }
+      style={accentOverride}
+    >
+      {/* Header */}
+      <div className="flex-shrink-0 px-5 py-4 border-b border-[color:var(--ui-panel-border)]">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-[color:var(--ui-item-border)] bg-[var(--ui-item-bg)]">
+              <AppIcon name={widgetDef.icon} className="w-5 h-5 text-[var(--ui-text)]" />
+            </span>
+            <div className="min-w-0">
+              <h2 className={isDialog ? 'text-xl font-bold text-[var(--ui-text)]' : 'text-sm font-semibold text-[var(--ui-text)]'}>
+                {isDialog ? `Configure ${widgetDef.name}` : widgetDef.name}
+              </h2>
+              <p className="mt-1 text-xs leading-5 text-[var(--ui-text-muted)]">{widgetDef.description}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg transition-colors text-[var(--ui-text-muted)] hover:bg-[var(--ui-item-hover)]"
+            aria-label="Close"
+            title="Close settings"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Content - Scrollable */}
+      <div className={isDialog ? 'flex-1 overflow-y-auto p-6 space-y-6' : 'flex-1 overflow-y-auto p-4 space-y-5'}>
+        {/* Coming Soon Toggle */}
+        <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-[var(--ui-item-bg)] border border-[color:var(--ui-item-border)]">
+          <div>
+            <div className="text-sm font-medium text-[var(--ui-text)]">Coming Soon</div>
+            <div className="text-xs text-[var(--ui-text-muted)]">Gray out this widget with a &quot;Coming Soon&quot; overlay</div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={comingSoon}
+            onClick={() => setComingSoon(!comingSoon)}
+            className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0"
+            style={{ backgroundColor: comingSoon ? `var(--ui-switch-on)` : `var(--ui-switch-off)` }}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                comingSoon ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* Source Picker — shown when sources are available and widget accepts them */}
+        {sources && sources.length > 0 && widgetDef.acceptsSources && widgetDef.acceptsSources.length > 0 && (
+          <SourcePicker
+            bindings={widgetDef.acceptsSources}
+            sources={sources}
+            data={data}
+            onChange={handleChange}
+          />
+        )}
+
+        {OptionsComponent ? (
+          <OptionsComponent data={data} onChange={handleChange} />
+        ) : (
+          <div className="text-center py-8 text-[var(--ui-text-muted)]">
+            <p>No additional configuration options available for this widget.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className={isDialog ? 'flex-shrink-0 px-6 py-4 border-t border-[color:var(--ui-panel-border)] bg-[var(--ui-item-bg)] rounded-b-xl' : 'flex-shrink-0 px-4 py-3 border-t border-[color:var(--ui-panel-border)] bg-[var(--ui-item-bg)]'}>
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-[var(--ui-text-muted)] bg-[var(--ui-item-bg)] hover:bg-[var(--ui-item-hover)] rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors hover:opacity-90 bg-[var(--color-accent)]"
+          >
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (!isDialog) {
+    return content;
+  }
+
   return (
     <dialog
       ref={dialogRef}
       className="backdrop:bg-black/50 bg-transparent fixed inset-0 m-0 p-4 w-full h-full max-w-none max-h-none flex items-center justify-center"
       onClick={handleBackdropClick}
     >
-      <div
-        className="widget-edit-dialog rounded-xl shadow-2xl flex flex-col w-full max-w-2xl max-h-[90vh] border border-[color:var(--ui-panel-border)] bg-[var(--ui-panel-solid,theme(colors.white))] text-[var(--ui-text)]"
-        style={accentOverride}
-      >
-        {/* Header */}
-        <div className="flex-shrink-0 px-6 py-4 border-b border-[color:var(--ui-panel-border)]">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <AppIcon name={widgetDef.icon} className="w-7 h-7 text-[var(--ui-text)]" />
-              <div>
-                <h2 className="text-xl font-bold text-[var(--ui-text)]">Configure {widgetDef.name}</h2>
-                <p className="text-sm text-[var(--ui-text-muted)]">{widgetDef.description}</p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-lg transition-colors text-[var(--ui-text-muted)] hover:bg-[var(--ui-item-hover)]"
-              aria-label="Close"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Content - Scrollable */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Coming Soon Toggle */}
-          <div className="flex items-center justify-between p-3 rounded-lg bg-[var(--ui-item-bg)] border border-[color:var(--ui-item-border)]">
-            <div>
-              <div className="text-sm font-medium text-[var(--ui-text)]">Coming Soon</div>
-              <div className="text-xs text-[var(--ui-text-muted)]">Gray out this widget with a &quot;Coming Soon&quot; overlay</div>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={comingSoon}
-              onClick={() => setComingSoon(!comingSoon)}
-              className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0"
-              style={{ backgroundColor: comingSoon ? `var(--ui-switch-on)` : `var(--ui-switch-off)` }}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  comingSoon ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
-
-          {/* Source Picker — shown when sources are available and widget accepts them */}
-          {sources && sources.length > 0 && widgetDef.acceptsSources && widgetDef.acceptsSources.length > 0 && (
-            <SourcePicker
-              bindings={widgetDef.acceptsSources}
-              sources={sources}
-              data={data}
-              onChange={handleChange}
-            />
-          )}
-
-          {OptionsComponent ? (
-            <OptionsComponent data={data} onChange={handleChange} />
-          ) : (
-            <div className="text-center py-8 text-[var(--ui-text-muted)]">
-              <p>No additional configuration options available for this widget.</p>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex-shrink-0 px-6 py-4 border-t border-[color:var(--ui-panel-border)] bg-[var(--ui-item-bg)] rounded-b-xl">
-          <div className="flex justify-end gap-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-[var(--ui-text-muted)] bg-[var(--ui-item-bg)] hover:bg-[var(--ui-item-hover)] rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors hover:opacity-90 bg-[var(--color-accent)]"
-            >
-              Save Changes
-            </button>
-          </div>
-        </div>
-      </div>
+      {content}
     </dialog>
   );
 }
