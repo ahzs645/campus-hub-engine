@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getWidget, AppIcon } from '@firstform/campus-hub-widget-sdk';
+import { getWidget, AppIcon, SchemaOptionsForm } from '@firstform/campus-hub-widget-sdk';
 import type { SourceBinding } from '@firstform/campus-hub-widget-sdk';
 
 export interface ContentSource {
@@ -77,6 +77,7 @@ function WidgetEditForm({
 
   const widgetDef = getWidget(widgetType);
   const OptionsComponent = widgetDef?.OptionsComponent;
+  const optionsSchema = widgetDef?.optionsSchema;
 
   const isDialog = presentation === 'dialog';
 
@@ -197,6 +198,8 @@ function WidgetEditForm({
 
         {OptionsComponent ? (
           <OptionsComponent data={data} onChange={handleChange} />
+        ) : optionsSchema && optionsSchema.length > 0 ? (
+          <SchemaOptionsForm schema={optionsSchema} data={data} onChange={handleChange} />
         ) : (
           <div className="text-center py-8 text-[var(--ui-text-muted)]">
             <p>No additional configuration options available for this widget.</p>
