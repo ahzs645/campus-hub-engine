@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getWidget, AppIcon, SchemaOptionsForm } from '@firstform/campus-hub-widget-sdk';
-import type { SourceBinding } from '@firstform/campus-hub-widget-sdk';
+import { getWidget, AppIcon, SchemaOptionsForm, describeCapabilities, meetsRequirement } from '@firstform/campus-hub-widget-sdk';
+import type { SourceBinding, SourceCapabilities, LinkedSource } from '@firstform/campus-hub-widget-sdk';
 
 export interface ContentSource {
   _id: string;
@@ -10,6 +10,7 @@ export interface ContentSource {
   sourceType: string;
   description?: string;
   metadata?: { provider?: string; thumbnailUrl?: string };
+  capabilities?: SourceCapabilities;
 }
 
 export interface WidgetEditDialogProps {
@@ -78,6 +79,13 @@ function WidgetEditForm({
   const widgetDef = getWidget(widgetType);
   const OptionsComponent = widgetDef?.OptionsComponent;
   const optionsSchema = widgetDef?.optionsSchema;
+
+  // Resolve the currently-linked library source (if any) so options UIs can
+  // reflect it — the picker writes `__sourceRef` when a source is linked.
+  const sourceRef = data.__sourceRef as { sourceId?: string; propName?: string } | undefined;
+  const linkedSource = sourceRef?.sourceId
+    ? (sources?.find((s) => s._id === sourceRef.sourceId) as LinkedSource | undefined)
+    : undefined;
 
   const isDialog = presentation === 'dialog';
 
@@ -197,7 +205,7 @@ function WidgetEditForm({
         )}
 
         {OptionsComponent ? (
-          <OptionsComponent data={data} onChange={handleChange} />
+          <OptionsComponent data={data} onChange={handleChange} linkedSource={linkedSource} />
         ) : optionsSchema && optionsSchema.length > 0 ? (
           <SchemaOptionsForm schema={optionsSchema} data={data} onChange={handleChange} />
         ) : (
@@ -280,13 +288,28 @@ function SourcePicker({
     onChange(rest);
   };
 
-  // Filter sources to only show types this widget accepts
-  const matchingSources = sources.filter((source) =>
-    bindings.some((binding) =>
+  // Resolve, for each accepted source, its binding + whether it satisfies the
+  // binding's capability requirement. Sources that don't meet `requires` are
+  // still shown (greyed, with a reason) rather than hidden, so the choice stays
+  // legible — capabilities can be stale or unknown.
+  const findBinding = (source: ContentSource) =>
+    bindings.find((binding) =>
       binding.types.includes(source.sourceType as any) &&
       (!binding.matchSource || binding.matchSource(source as any))
-    )
-  );
+    );
+
+  type PickerEntry = { source: ContentSource; binding: SourceBinding; meets: boolean; reason?: string };
+  const matchingSources: PickerEntry[] = [];
+  for (const source of sources) {
+    const binding = findBinding(source);
+    if (!binding) continue;
+    const requirement = meetsRequirement(source.capabilities, binding.requires);
+    matchingSources.push({ source, binding, meets: requirement.ok, reason: requirement.reason });
+  }
+  // Sources that meet requirements float to the top.
+  matchingSources.sort((a, b) => Number(b.meets) - Number(a.meets));
+
+  const hint = bindings.find((b) => b.capabilityHint)?.capabilityHint;
 
   if (matchingSources.length === 0) return null;
 
@@ -321,6 +344,9 @@ function SourcePicker({
           <p className="text-xs text-[var(--ui-text-muted)] mb-2">
             Pick a source from your library to link to this widget. The URL will stay in sync when you update the source.
           </p>
+          {hint && (
+            <p className="text-xs text-[var(--color-accent)] mb-2">{hint}</p>
+          )}
 
           {linkedSource && (
             <div className="flex items-center justify-between p-2 rounded-lg border border-[color:var(--ui-accent-soft)] bg-[var(--ui-accent-soft)]">
@@ -337,25 +363,23 @@ function SourcePicker({
             </div>
           )}
 
-          <div className="max-h-48 overflow-y-auto space-y-1">
-            {matchingSources.map((source) => {
+          <div className="max-h-64 overflow-y-auto space-y-1">
+            {matchingSources.map(({ source, binding, meets, reason }) => {
               const isLinked = sourceRef?.sourceId === source._id;
-              const matchingBinding = bindings.find((binding) =>
-                binding.types.includes(source.sourceType as any) &&
-                (!binding.matchSource || binding.matchSource(source as any))
-              ) ?? bindings[0];
+              const chips = source.capabilities ? describeCapabilities(source.capabilities) : [];
               return (
                 <button
                   key={source._id}
                   onClick={() => {
-                    if (!isLinked) handlePickSource(matchingBinding, source);
+                    if (!isLinked) handlePickSource(binding, source);
                   }}
                   disabled={isLinked}
-                  className={`w-full text-left p-2 rounded-lg flex items-center gap-3 transition-colors ${
+                  title={!meets && reason ? reason : undefined}
+                  className={`w-full text-left p-2 rounded-lg flex items-start gap-3 transition-colors ${
                     isLinked ? 'cursor-default bg-[var(--ui-accent-soft)]' : 'hover:bg-[var(--ui-item-hover)]'
-                  }`}
+                  } ${!meets ? 'opacity-60' : ''}`}
                 >
-                  <div className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0 overflow-hidden bg-[var(--ui-item-bg)]">
+                  <div className="w-8 h-8 mt-0.5 rounded flex items-center justify-center flex-shrink-0 overflow-hidden bg-[var(--ui-item-bg)]">
                     {source.sourceType === 'image' ? (
                       <img src={source.url} alt="" className="w-full h-full object-cover" />
                     ) : source.metadata?.thumbnailUrl ? (
@@ -365,12 +389,30 @@ function SourcePicker({
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium truncate text-[var(--ui-text)]">{source.name}</div>
-                    <div className="text-xs truncate text-[var(--ui-text-muted)]">{source.url}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium truncate text-[var(--ui-text)]">{source.name}</span>
+                      {isLinked && (
+                        <span className="text-xs flex-shrink-0 text-[var(--color-accent)]">Linked</span>
+                      )}
+                    </div>
+                    {chips.length > 0 ? (
+                      <div className="mt-1 flex flex-wrap items-center gap-1">
+                        {chips.map((chip) => (
+                          <span
+                            key={chip}
+                            className="rounded-full bg-[var(--ui-item-bg)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--ui-text-muted)] border border-[color:var(--ui-item-border)]"
+                          >
+                            {chip}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-xs truncate text-[var(--ui-text-muted)]">{source.url}</div>
+                    )}
+                    {!meets && reason && (
+                      <div className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">⚠ {reason}</div>
+                    )}
                   </div>
-                  {isLinked && (
-                    <span className="text-xs flex-shrink-0 text-[var(--color-accent)]">Linked</span>
-                  )}
                 </button>
               );
             })}
