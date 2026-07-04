@@ -23,7 +23,7 @@ import {
   getWidget,
 } from '@firstform/campus-hub-widget-sdk';
 import WidgetRenderer from './WidgetRenderer';
-import WidgetEditDialog from './WidgetEditDialog';
+import WidgetEditDialog, { type ContentSource } from './WidgetEditDialog';
 import type { GridStackWrapperRef } from './GridStackWrapper';
 
 interface ConfiguratorProps {
@@ -33,12 +33,18 @@ interface ConfiguratorProps {
   onChange?: (config: DisplayConfig) => void;
   /** Optional CSS class */
   className?: string;
+  /**
+   * Content sources the host makes available for linking; enables the edit
+   * dialog's SourcePicker and capability chips when provided.
+   */
+  sources?: ContentSource[];
 }
 
 export function Configurator({
   config: initialConfig,
   onChange,
   className,
+  sources,
 }: ConfiguratorProps) {
   const [config, setConfig] = useState<DisplayConfig>(
     initialConfig ? normalizeConfig(initialConfig) : DEFAULT_CONFIG
@@ -200,6 +206,7 @@ export function Configurator({
           widgetType={editingWidgetData.type}
           initialData={editingWidgetData.props ?? {}}
           comingSoon={editingWidgetData.comingSoon}
+          sources={sources}
           onSave={handleSaveWidgetOptions}
           onClose={() => setEditingWidget(null)}
         />
