@@ -58,4 +58,53 @@ describe('WidgetEditPanel source picker', () => {
     expect(savedData.dataSource).toBe('default');
     expect(savedData).not.toHaveProperty('__sourceRef');
   });
+
+  it('fires onViewSource with the linked source id when provided', async () => {
+    const user = userEvent.setup();
+    const onViewSource = vi.fn();
+
+    render(
+      <WidgetEditPanel
+        widgetId="poster-1"
+        widgetType="source-picker-test"
+        initialData={{
+          __sourceRef: { sourceId: 'unbc-news', propName: 'apiUrl' },
+        }}
+        sources={[{
+          _id: 'unbc-news',
+          name: 'UNBC News Releases',
+          url: 'https://www.unbc.ca/our-stories/releases',
+          sourceType: 'api',
+        }]}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+        onViewSource={onViewSource}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'View source' }));
+    expect(onViewSource).toHaveBeenCalledWith('unbc-news');
+  });
+
+  it('hides the view-source affordance when the host does not provide one', () => {
+    render(
+      <WidgetEditPanel
+        widgetId="poster-1"
+        widgetType="source-picker-test"
+        initialData={{
+          __sourceRef: { sourceId: 'unbc-news', propName: 'apiUrl' },
+        }}
+        sources={[{
+          _id: 'unbc-news',
+          name: 'UNBC News Releases',
+          url: 'https://www.unbc.ca/our-stories/releases',
+          sourceType: 'api',
+        }]}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'View source' })).not.toBeInTheDocument();
+  });
 });

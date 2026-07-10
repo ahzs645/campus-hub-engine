@@ -25,6 +25,8 @@ export interface WidgetEditDialogProps {
   sources?: ContentSource[];
   /** Optional accent color override — falls back to var(--color-accent) */
   accentColor?: string;
+  /** Optional: host-provided navigation to a linked source's detail view */
+  onViewSource?: (sourceId: string) => void;
 }
 
 export type WidgetEditPanelProps = Omit<WidgetEditDialogProps, 'isOpen'>;
@@ -39,6 +41,7 @@ export default function WidgetEditDialog({
   onClose,
   sources,
   accentColor,
+  onViewSource,
 }: WidgetEditDialogProps) {
   if (!isOpen) return null;
 
@@ -52,6 +55,7 @@ export default function WidgetEditDialog({
       accentColor={accentColor}
       onSave={onSave}
       onClose={onClose}
+      onViewSource={onViewSource}
       presentation="dialog"
     />
   );
@@ -70,6 +74,7 @@ function WidgetEditForm({
   onClose,
   sources,
   accentColor,
+  onViewSource,
   presentation,
 }: WidgetEditPanelProps & { presentation: 'dialog' | 'panel' }) {
   const [data, setData] = useState<Record<string, unknown>>(initialData);
@@ -201,6 +206,7 @@ function WidgetEditForm({
             sources={sources}
             data={data}
             onChange={handleChange}
+            onViewSource={onViewSource}
           />
         )}
 
@@ -256,11 +262,13 @@ function SourcePicker({
   sources,
   data,
   onChange,
+  onViewSource,
 }: {
   bindings: SourceBinding[];
   sources: ContentSource[];
   data: Record<string, unknown>;
   onChange: (newData: Record<string, unknown>) => void;
+  onViewSource?: (sourceId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -357,13 +365,24 @@ function SourcePicker({
                 <div className="mt-0.5 truncate text-sm font-medium text-[var(--ui-text)]">{linkedSource.name}</div>
                 <div className="truncate text-xs text-[var(--ui-text-muted)]">{linkedSource.url}</div>
               </div>
-              <button
-                type="button"
-                onClick={handleUnlink}
-                className="flex-shrink-0 rounded px-2 py-1 text-xs font-medium text-[var(--ui-text-muted)] transition-colors hover:bg-[var(--ui-item-hover)] hover:text-[var(--ui-text)]"
-              >
-                {linkedBinding?.unlinkLabel ?? 'Unlink'}
-              </button>
+              <div className="flex flex-shrink-0 items-center gap-1">
+                {onViewSource && sourceRef?.sourceId && (
+                  <button
+                    type="button"
+                    onClick={() => onViewSource(sourceRef.sourceId!)}
+                    className="rounded px-2 py-1 text-xs font-medium text-[var(--color-accent)] transition-colors hover:bg-[var(--ui-item-hover)]"
+                  >
+                    View source
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleUnlink}
+                  className="rounded px-2 py-1 text-xs font-medium text-[var(--ui-text-muted)] transition-colors hover:bg-[var(--ui-item-hover)] hover:text-[var(--ui-text)]"
+                >
+                  {linkedBinding?.unlinkLabel ?? 'Unlink'}
+                </button>
+              </div>
             </div>
             {linkedCapabilityChips.length > 0 && (
               <div className="mt-2 flex flex-wrap items-center gap-1">
