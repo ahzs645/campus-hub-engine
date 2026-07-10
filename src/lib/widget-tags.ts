@@ -30,6 +30,7 @@ export const WIDGET_TAGS: Record<string, string[]> = {
   'rss-reader':           ['Info'],
   'horoscope':            ['Fun', 'Info'],
   'team-schedule':        ['Info', 'Sports'],
+  'stream-player':        ['Media'],
   'poster-carousel':      ['Media'],
   'poster-feed':          ['Media'],
   'slideshow':            ['Media'],
