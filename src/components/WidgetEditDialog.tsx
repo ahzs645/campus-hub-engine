@@ -269,6 +269,12 @@ function SourcePicker({
   const linkedSource = sourceRef?.sourceId
     ? sources.find((s) => s._id === sourceRef.sourceId)
     : undefined;
+  const linkedBinding = sourceRef?.propName
+    ? bindings.find((binding) => binding.propName === sourceRef.propName)
+    : undefined;
+  const linkedCapabilityChips = linkedSource?.capabilities
+    ? describeCapabilities(linkedSource.capabilities)
+    : [];
 
   const handlePickSource = (binding: SourceBinding, source: ContentSource) => {
     const mappedData = binding.applySource
@@ -285,7 +291,11 @@ function SourcePicker({
 
   const handleUnlink = () => {
     const { __sourceRef, ...rest } = data;
-    onChange(rest);
+    const mappedData = linkedBinding?.removeSource
+      ? linkedBinding.removeSource(rest)
+      : {};
+    onChange({ ...rest, ...mappedData });
+    setExpanded(false);
   };
 
   // Resolve, for each accepted source, its binding + whether it satisfies the
@@ -308,6 +318,9 @@ function SourcePicker({
   }
   // Sources that meet requirements float to the top.
   matchingSources.sort((a, b) => Number(b.meets) - Number(a.meets));
+  const pickerSources = linkedSource
+    ? matchingSources.filter(({ source }) => source._id !== linkedSource._id)
+    : matchingSources;
 
   const hint = bindings.find((b) => b.capabilityHint)?.capabilityHint;
 
@@ -318,18 +331,14 @@ function SourcePicker({
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
         className="w-full flex items-center justify-between px-4 py-3 text-left"
       >
         <div className="flex items-center gap-2">
           <svg className="w-4 h-4 text-[var(--color-accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
           </svg>
-          <span className="text-sm font-medium text-[var(--ui-text)]">Content Source</span>
-          {linkedSource && (
-            <span className="px-2 py-0.5 rounded-full text-xs bg-[var(--ui-accent-soft)] text-[var(--color-accent)]">
-              {linkedSource.name}
-            </span>
-          )}
+          <span className="text-sm font-medium text-[var(--ui-text)]">Data Source</span>
         </div>
         <svg
           className={`w-4 h-4 text-[var(--ui-text-muted)] transition-transform ${expanded ? 'rotate-180' : ''}`}
@@ -338,6 +347,42 @@ function SourcePicker({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
+
+      {linkedSource && (
+        <div className="border-t border-[color:var(--ui-item-border)] px-3 py-3">
+          <div className="rounded-lg border border-[color:var(--ui-accent-soft)] bg-[var(--ui-accent-soft)] p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-xs font-medium uppercase tracking-wide text-[var(--color-accent)]">Linked source</div>
+                <div className="mt-0.5 truncate text-sm font-medium text-[var(--ui-text)]">{linkedSource.name}</div>
+                <div className="truncate text-xs text-[var(--ui-text-muted)]">{linkedSource.url}</div>
+              </div>
+              <button
+                type="button"
+                onClick={handleUnlink}
+                className="flex-shrink-0 rounded px-2 py-1 text-xs font-medium text-[var(--ui-text-muted)] transition-colors hover:bg-[var(--ui-item-hover)] hover:text-[var(--ui-text)]"
+              >
+                {linkedBinding?.unlinkLabel ?? 'Unlink'}
+              </button>
+            </div>
+            {linkedCapabilityChips.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-1">
+                {linkedCapabilityChips.map((chip) => (
+                  <span
+                    key={chip}
+                    className="rounded-full border border-[color:var(--ui-item-border)] bg-[var(--ui-item-bg)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--ui-text-muted)]"
+                  >
+                    {chip}
+                  </span>
+                ))}
+              </div>
+            )}
+            {linkedSource.description && (
+              <div className="mt-2 text-xs text-[var(--ui-text-muted)]">{linkedSource.description}</div>
+            )}
+          </div>
+        </div>
+      )}
 
       {expanded && (
         <div className="px-4 pb-4 space-y-2 border-t border-[color:var(--ui-item-border)] pt-3">
@@ -348,36 +393,17 @@ function SourcePicker({
             <p className="text-xs text-[var(--color-accent)] mb-2">{hint}</p>
           )}
 
-          {linkedSource && (
-            <div className="flex items-center justify-between p-2 rounded-lg border border-[color:var(--ui-accent-soft)] bg-[var(--ui-accent-soft)]">
-              <div className="min-w-0">
-                <div className="text-sm font-medium truncate text-[var(--color-accent)]">{linkedSource.name}</div>
-                <div className="text-xs truncate text-[var(--ui-text-muted)]">{linkedSource.url}</div>
-              </div>
-              <button
-                onClick={handleUnlink}
-                className="ml-2 px-2 py-1 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors flex-shrink-0"
-              >
-                Unlink
-              </button>
-            </div>
-          )}
-
           <div className="max-h-64 overflow-y-auto space-y-1">
-            {matchingSources.map(({ source, binding, meets, reason }) => {
-              const isLinked = sourceRef?.sourceId === source._id;
+            {pickerSources.map(({ source, binding, meets, reason }) => {
               const chips = source.capabilities ? describeCapabilities(source.capabilities) : [];
               return (
                 <button
                   key={source._id}
-                  onClick={() => {
-                    if (!isLinked) handlePickSource(binding, source);
-                  }}
-                  disabled={isLinked}
+                  onClick={() => handlePickSource(binding, source)}
                   title={!meets && reason ? reason : undefined}
                   className={`w-full text-left p-2 rounded-lg flex items-start gap-3 transition-colors ${
-                    isLinked ? 'cursor-default bg-[var(--ui-accent-soft)]' : 'hover:bg-[var(--ui-item-hover)]'
-                  } ${!meets ? 'opacity-60' : ''}`}
+                    !meets ? 'opacity-60' : ''
+                  } hover:bg-[var(--ui-item-hover)]`}
                 >
                   <div className="w-8 h-8 mt-0.5 rounded flex items-center justify-center flex-shrink-0 overflow-hidden bg-[var(--ui-item-bg)]">
                     {source.sourceType === 'image' ? (
@@ -391,9 +417,6 @@ function SourcePicker({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium truncate text-[var(--ui-text)]">{source.name}</span>
-                      {isLinked && (
-                        <span className="text-xs flex-shrink-0 text-[var(--color-accent)]">Linked</span>
-                      )}
                     </div>
                     {chips.length > 0 ? (
                       <div className="mt-1 flex flex-wrap items-center gap-1">
@@ -416,6 +439,9 @@ function SourcePicker({
                 </button>
               );
             })}
+            {pickerSources.length === 0 && (
+              <div className="py-2 text-xs text-[var(--ui-text-muted)]">No other compatible sources available.</div>
+            )}
           </div>
         </div>
       )}
