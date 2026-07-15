@@ -55,14 +55,15 @@ export function DisplayRenderer({
     if (!container) return;
 
     const update = () => {
-      const rect = container.getBoundingClientRect();
-      let width = rect.width;
-      let height = rect.height;
+      // Layout size (offsetWidth/Height) ignores CSS transforms on ancestors,
+      // so a rotated or scaled wrapper doesn't corrupt the fit calculation.
+      let width = container.offsetWidth;
+      let height = container.offsetHeight;
 
       if ((width <= 0 || height <= 0) && container.parentElement) {
-        const parentRect = container.parentElement.getBoundingClientRect();
-        width = width > 0 ? width : parentRect.width;
-        height = height > 0 ? height : parentRect.height;
+        const parent = container.parentElement;
+        width = width > 0 ? width : parent.offsetWidth;
+        height = height > 0 ? height : parent.offsetHeight;
       }
 
       if (width <= 0 || height <= 0) return;
