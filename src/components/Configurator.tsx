@@ -21,6 +21,7 @@ import {
   buildWidgetInitialProps,
   getAllWidgets,
   getWidget,
+  type SimpleVisibilityCondition,
 } from '@firstform/campus-hub-widget-sdk';
 import WidgetRenderer from './WidgetRenderer';
 import WidgetEditDialog, { type ContentSource } from './WidgetEditDialog';
@@ -109,12 +110,22 @@ export function Configurator({
   }, []);
 
   const handleSaveWidgetOptions = useCallback(
-    (widgetId: string, data: Record<string, unknown>, comingSoon: boolean) => {
+    (
+      widgetId: string,
+      data: Record<string, unknown>,
+      comingSoon: boolean,
+      visibilityCondition?: SimpleVisibilityCondition,
+    ) => {
       setConfig((prev) => ({
         ...prev,
         layout: prev.layout.map((widget) =>
           widget.id === widgetId
-            ? { ...widget, props: data, comingSoon: comingSoon || undefined }
+            ? {
+                ...widget,
+                props: data,
+                comingSoon: comingSoon || undefined,
+                visibilityCondition,
+              }
             : widget
         ),
       }));
@@ -181,6 +192,11 @@ export function Configurator({
 
                     />
                   </div>
+                  {widget.visibilityCondition && (
+                    <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950">
+                      Conditional
+                    </span>
+                  )}
                   {/* Remove button */}
                   <button
                     onClick={(e) => {
@@ -206,6 +222,7 @@ export function Configurator({
           widgetType={editingWidgetData.type}
           initialData={editingWidgetData.props ?? {}}
           comingSoon={editingWidgetData.comingSoon}
+          initialVisibilityCondition={editingWidgetData.visibilityCondition}
           sources={sources}
           onSave={handleSaveWidgetOptions}
           onClose={() => setEditingWidget(null)}

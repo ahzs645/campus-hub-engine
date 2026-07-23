@@ -107,4 +107,38 @@ describe('WidgetEditPanel source picker', () => {
 
     expect(screen.queryByRole('button', { name: 'View source' })).not.toBeInTheDocument();
   });
+
+  it('saves a common visibility condition', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+
+    render(
+      <WidgetEditPanel
+        widgetId="poster-1"
+        widgetType="source-picker-test"
+        initialData={{}}
+        onSave={onSave}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('switch', { name: 'Conditional visibility' }));
+    await user.selectOptions(screen.getByLabelText('Behavior'), 'pulse');
+    await user.clear(screen.getByLabelText('Auto-hide seconds'));
+    await user.type(screen.getByLabelText('Auto-hide seconds'), '10');
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    expect(onSave).toHaveBeenCalledWith(
+      'poster-1',
+      {},
+      false,
+      {
+        source: { kind: 'signal', key: 'emergency' },
+        operator: 'equals',
+        value: true,
+        behavior: 'pulse',
+        autoHideSeconds: 10,
+      },
+    );
+  });
 });

@@ -1,10 +1,24 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getWidget, AppIcon, SchemaOptionsForm, describeCapabilities, meetsRequirement } from '@firstform/campus-hub-widget-sdk';
-import type { SourceBinding, SourceCapabilities, LinkedSource } from '@firstform/campus-hub-widget-sdk';
+import {
+  getWidget,
+  AppIcon,
+  SchemaOptionsForm,
+  describeCapabilities,
+  isVisibilitySignalKey,
+  meetsRequirement,
+  parseVisibilityScalar,
+} from '@firstform/campus-hub-widget-sdk';
+import type {
+  LinkedSource,
+  SimpleVisibilityCondition,
+  SourceBinding,
+  SourceCapabilities,
+} from '@firstform/campus-hub-widget-sdk';
 
 export interface ContentSource {
   _id: string;
+  presetId?: string;
   name: string;
   url: string;
   sourceType: string;
@@ -19,7 +33,13 @@ export interface WidgetEditDialogProps {
   widgetType: string;
   initialData: Record<string, unknown>;
   comingSoon?: boolean;
-  onSave: (widgetId: string, data: Record<string, unknown>, comingSoon: boolean) => void;
+  initialVisibilityCondition?: SimpleVisibilityCondition;
+  onSave: (
+    widgetId: string,
+    data: Record<string, unknown>,
+    comingSoon: boolean,
+    visibilityCondition?: SimpleVisibilityCondition,
+  ) => void;
   onClose: () => void;
   /** Optional: available content sources for the source picker */
   sources?: ContentSource[];
@@ -37,6 +57,7 @@ export default function WidgetEditDialog({
   widgetType,
   initialData,
   comingSoon: initialComingSoon = false,
+  initialVisibilityCondition,
   onSave,
   onClose,
   sources,
@@ -51,6 +72,7 @@ export default function WidgetEditDialog({
       widgetType={widgetType}
       initialData={initialData}
       comingSoon={initialComingSoon}
+      initialVisibilityCondition={initialVisibilityCondition}
       sources={sources}
       accentColor={accentColor}
       onSave={onSave}
@@ -70,6 +92,7 @@ function WidgetEditForm({
   widgetType,
   initialData,
   comingSoon: initialComingSoon = false,
+  initialVisibilityCondition,
   onSave,
   onClose,
   sources,
@@ -79,6 +102,26 @@ function WidgetEditForm({
 }: WidgetEditPanelProps & { presentation: 'dialog' | 'panel' }) {
   const [data, setData] = useState<Record<string, unknown>>(initialData);
   const [comingSoon, setComingSoon] = useState(initialComingSoon);
+  const [visibilityEnabled, setVisibilityEnabled] = useState(
+    initialVisibilityCondition !== undefined,
+  );
+  const [signalKey, setSignalKey] = useState(
+    initialVisibilityCondition?.source.key ?? 'emergency',
+  );
+  const [visibilityOperator, setVisibilityOperator] = useState<
+    SimpleVisibilityCondition['operator']
+  >(initialVisibilityCondition?.operator ?? 'equals');
+  const [expectedValue, setExpectedValue] = useState(
+    initialVisibilityCondition?.value === null
+      ? 'null'
+      : String(initialVisibilityCondition?.value ?? 'true'),
+  );
+  const [visibilityBehavior, setVisibilityBehavior] = useState<
+    SimpleVisibilityCondition['behavior']
+  >(initialVisibilityCondition?.behavior ?? 'while-matched');
+  const [autoHideSeconds, setAutoHideSeconds] = useState(
+    initialVisibilityCondition?.autoHideSeconds ?? 15,
+  );
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   const widgetDef = getWidget(widgetType);
@@ -98,7 +141,24 @@ function WidgetEditForm({
   useEffect(() => {
     setData(initialData);
     setComingSoon(initialComingSoon);
-  }, [widgetId, initialData, initialComingSoon]);
+    setVisibilityEnabled(initialVisibilityCondition !== undefined);
+    setSignalKey(initialVisibilityCondition?.source.key ?? 'emergency');
+    setVisibilityOperator(initialVisibilityCondition?.operator ?? 'equals');
+    setExpectedValue(
+      initialVisibilityCondition?.value === null
+        ? 'null'
+        : String(initialVisibilityCondition?.value ?? 'true'),
+    );
+    setVisibilityBehavior(
+      initialVisibilityCondition?.behavior ?? 'while-matched',
+    );
+    setAutoHideSeconds(initialVisibilityCondition?.autoHideSeconds ?? 15);
+  }, [
+    widgetId,
+    initialData,
+    initialComingSoon,
+    initialVisibilityCondition,
+  ]);
 
   // Control dialog open/close
   useEffect(() => {
@@ -119,9 +179,45 @@ function WidgetEditForm({
   }, []);
 
   const handleSave = useCallback(() => {
-    onSave(widgetId, data, comingSoon);
+    const trimmedSignalKey = signalKey.trim();
+    if (visibilityEnabled && !isVisibilitySignalKey(trimmedSignalKey)) return;
+    if (
+      visibilityEnabled &&
+      visibilityBehavior === 'pulse' &&
+      (!Number.isFinite(autoHideSeconds) || autoHideSeconds <= 0)
+    ) {
+      return;
+    }
+
+    const requiresExpectedValue =
+      visibilityOperator === 'equals' ||
+      visibilityOperator === 'not-equals';
+    const visibilityCondition = visibilityEnabled
+      ? {
+          source: { kind: 'signal' as const, key: trimmedSignalKey },
+          operator: visibilityOperator,
+          ...(requiresExpectedValue
+            ? { value: parseVisibilityScalar(expectedValue) }
+            : {}),
+          behavior: visibilityBehavior,
+          ...(visibilityBehavior === 'pulse' ? { autoHideSeconds } : {}),
+        }
+      : undefined;
+    onSave(widgetId, data, comingSoon, visibilityCondition);
     onClose();
-  }, [widgetId, data, comingSoon, onSave, onClose]);
+  }, [
+    autoHideSeconds,
+    comingSoon,
+    data,
+    expectedValue,
+    onClose,
+    onSave,
+    signalKey,
+    visibilityBehavior,
+    visibilityEnabled,
+    visibilityOperator,
+    widgetId,
+  ]);
 
   const handleBackdropClick = useCallback(
     (e: React.MouseEvent<HTMLDialogElement>) => {
@@ -197,6 +293,134 @@ function WidgetEditForm({
               }`}
             />
           </button>
+        </div>
+
+        {/* Runtime Visibility */}
+        <div className="rounded-lg border border-[color:var(--ui-item-border)] bg-[var(--ui-item-bg)]">
+          <div className="flex items-center justify-between gap-4 p-3">
+            <div>
+              <div className="text-sm font-medium text-[var(--ui-text)]">Visibility</div>
+              <div className="text-xs text-[var(--ui-text-muted)]">
+                Only show this widget when a live display signal matches
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-label="Conditional visibility"
+              aria-checked={visibilityEnabled}
+              onClick={() => setVisibilityEnabled((enabled) => !enabled)}
+              className="relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors"
+              style={{
+                backgroundColor: visibilityEnabled
+                  ? 'var(--ui-switch-on)'
+                  : 'var(--ui-switch-off)',
+              }}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  visibilityEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {visibilityEnabled && (
+            <div className="space-y-4 border-t border-[color:var(--ui-item-border)] p-4">
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-[var(--ui-text-muted)]">
+                  Signal key
+                </span>
+                <input
+                  value={signalKey}
+                  onChange={(event) => setSignalKey(event.target.value)}
+                  placeholder="emergency"
+                  aria-invalid={!isVisibilitySignalKey(signalKey.trim())}
+                  className="w-full rounded-lg border border-[color:var(--ui-item-border)] bg-[var(--ui-panel-solid,white)] px-3 py-2 text-sm text-[var(--ui-text)] outline-none focus:border-[var(--color-accent)]"
+                />
+                {!isVisibilitySignalKey(signalKey.trim()) && (
+                  <span className="mt-1 block text-xs text-red-500">
+                    Use 1–64 letters, numbers, dots, colons, underscores, or hyphens.
+                  </span>
+                )}
+              </label>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-[var(--ui-text-muted)]">
+                    Condition
+                  </span>
+                  <select
+                    value={visibilityOperator}
+                    onChange={(event) =>
+                      setVisibilityOperator(
+                        event.target.value as SimpleVisibilityCondition['operator'],
+                      )
+                    }
+                    className="w-full rounded-lg border border-[color:var(--ui-item-border)] bg-[var(--ui-panel-solid,white)] px-3 py-2 text-sm text-[var(--ui-text)] outline-none focus:border-[var(--color-accent)]"
+                  >
+                    <option value="equals">Equals</option>
+                    <option value="not-equals">Does not equal</option>
+                    <option value="truthy">Is truthy</option>
+                    <option value="falsy">Is falsy</option>
+                  </select>
+                </label>
+
+                {(visibilityOperator === 'equals' ||
+                  visibilityOperator === 'not-equals') && (
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-[var(--ui-text-muted)]">
+                      Expected value
+                    </span>
+                    <input
+                      value={expectedValue}
+                      onChange={(event) => setExpectedValue(event.target.value)}
+                      placeholder="true"
+                      className="w-full rounded-lg border border-[color:var(--ui-item-border)] bg-[var(--ui-panel-solid,white)] px-3 py-2 text-sm text-[var(--ui-text)] outline-none focus:border-[var(--color-accent)]"
+                    />
+                  </label>
+                )}
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-[var(--ui-text-muted)]">
+                    Behavior
+                  </span>
+                  <select
+                    value={visibilityBehavior}
+                    onChange={(event) =>
+                      setVisibilityBehavior(
+                        event.target.value as SimpleVisibilityCondition['behavior'],
+                      )
+                    }
+                    className="w-full rounded-lg border border-[color:var(--ui-item-border)] bg-[var(--ui-panel-solid,white)] px-3 py-2 text-sm text-[var(--ui-text)] outline-none focus:border-[var(--color-accent)]"
+                  >
+                    <option value="while-matched">While condition matches</option>
+                    <option value="pulse">Show for a duration</option>
+                  </select>
+                </label>
+
+                {visibilityBehavior === 'pulse' && (
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-[var(--ui-text-muted)]">
+                      Auto-hide seconds
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={autoHideSeconds}
+                      onChange={(event) =>
+                        setAutoHideSeconds(Number(event.target.value))
+                      }
+                      className="w-full rounded-lg border border-[color:var(--ui-item-border)] bg-[var(--ui-panel-solid,white)] px-3 py-2 text-sm text-[var(--ui-text)] outline-none focus:border-[var(--color-accent)]"
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Source Picker — shown when sources are available and widget accepts them */}

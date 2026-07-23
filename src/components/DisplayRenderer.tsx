@@ -10,21 +10,25 @@
  *   <DisplayRenderer config={config} />
  */
 import { useMemo, useRef, useEffect, useLayoutEffect, useState } from 'react';
-import type { DisplayConfig, WidgetConfig } from '../lib/config';
+import type { VisibilitySignal } from '@firstform/campus-hub-widget-sdk';
+import type { WidgetConfig } from '../lib/config';
 import { normalizeConfig, DEFAULT_CONFIG } from '../lib/config';
+import { useWidgetVisibility } from '../lib/widget-visibility';
 import WidgetRenderer from './WidgetRenderer';
 
 const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 interface DisplayRendererProps {
   /** The display configuration to render */
-  config: DisplayConfig | null | undefined;
+  config: unknown;
   /** Optional CSS class for the outer container */
   className?: string;
   /** Reference width for scaling (default 1920) */
   designWidth?: number;
   /** Reference height for scaling (default 1080) */
   designHeight?: number;
+  /** Runtime signals. Undefined keeps all widgets visible for editing/previews. */
+  visibilitySignals?: readonly VisibilitySignal[];
 }
 
 export function DisplayRenderer({
@@ -32,6 +36,7 @@ export function DisplayRenderer({
   className,
   designWidth = 1920,
   designHeight = 1080,
+  visibilitySignals,
 }: DisplayRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState<number | null>(null);
@@ -95,6 +100,10 @@ export function DisplayRenderer({
 
   const cellWidth = actualDesignWidth / gridCols;
   const cellHeight = actualDesignHeight / gridRows;
+  const widgetVisibility = useWidgetVisibility(
+    config.layout,
+    visibilitySignals,
+  );
 
   return (
     <div
@@ -125,25 +134,32 @@ export function DisplayRenderer({
           visibility: scale === null ? 'hidden' : 'visible',
         }}
       >
-        {config.layout.map((widget: WidgetConfig) => (
-          <div
-            key={widget.id}
-            style={{
-              position: 'absolute',
-              left: widget.x * cellWidth,
-              top: widget.y * cellHeight,
-              width: widget.w * cellWidth,
-              height: widget.h * cellHeight,
-              padding: 4,
-            }}
-          >
-            <WidgetRenderer
-              widget={widget}
-              theme={config.theme}
-
-            />
-          </div>
-        ))}
+        {config.layout.map((widget: WidgetConfig) => {
+          const visible =
+            widgetVisibility.get(widget.id) ??
+            (visibilitySignals === undefined || !widget.visibilityCondition);
+          return (
+            <div
+              key={widget.id}
+              style={{
+                position: 'absolute',
+                left: widget.x * cellWidth,
+                top: widget.y * cellHeight,
+                width: widget.w * cellWidth,
+                height: widget.h * cellHeight,
+                padding: 4,
+                opacity: visible ? 1 : 0,
+                pointerEvents: visible ? 'auto' : 'none',
+                visibility: visible ? 'visible' : 'hidden',
+              }}
+            >
+              <WidgetRenderer
+                widget={widget}
+                theme={config.theme}
+              />
+            </div>
+          );
+        })}
       </div>
     </div>
   );

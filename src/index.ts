@@ -25,6 +25,13 @@ export {
   type WidgetDefinition,
   type WidgetComponentProps,
   type WidgetOptionsProps,
+  evaluateVisibilityCondition,
+  isVisibilitySignalKey,
+  normalizeVisibilityCondition,
+  parseVisibilityScalar,
+  type SimpleVisibilityCondition,
+  type VisibilityScalar,
+  type VisibilitySignal,
   // Data Utilities
   fetchJsonWithCache,
   fetchTextWithCache,
@@ -49,6 +56,8 @@ export {
   FormSwitch,
   FormStepper,
 } from '@firstform/campus-hub-widget-sdk';
+
+export { useWidgetVisibility } from './lib/widget-visibility';
 
 // === Theme Context ===
 export { EngineThemeProvider, useEngineTheme, type EngineTheme } from './lib/ThemeContext';
