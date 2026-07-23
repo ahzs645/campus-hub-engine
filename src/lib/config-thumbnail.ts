@@ -74,7 +74,13 @@ export function buildConfigThumbnailSvg(
   const footerY = displayY + displayHeight - footerHeight;
 
   const widgets = normalized.layout
-    .map((widget, index) => {
+    .map((widget, index) => ({ widget, index }))
+    .sort(
+      (a, b) =>
+        (a.widget.zIndex ?? a.index) - (b.widget.zIndex ?? b.index) ||
+        a.index - b.index,
+    )
+    .map(({ widget }, index) => {
       const x = displayX + widget.x * cellWidth;
       const y = displayY + widget.y * cellHeight;
       const widgetWidth = widget.w * cellWidth;

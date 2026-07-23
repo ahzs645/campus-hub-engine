@@ -134,7 +134,7 @@ export function DisplayRenderer({
           visibility: scale === null ? 'hidden' : 'visible',
         }}
       >
-        {config.layout.map((widget: WidgetConfig) => {
+        {config.layout.map((widget: WidgetConfig, index) => {
           const visible =
             widgetVisibility.get(widget.id) ??
             (visibilitySignals === undefined || !widget.visibilityCondition);
@@ -143,6 +143,7 @@ export function DisplayRenderer({
               key={widget.id}
               style={{
                 position: 'absolute',
+                zIndex: widget.zIndex ?? index,
                 left: widget.x * cellWidth,
                 top: widget.y * cellHeight,
                 width: widget.w * cellWidth,
@@ -153,10 +154,16 @@ export function DisplayRenderer({
                 visibility: visible ? 'visible' : 'hidden',
               }}
             >
-              <WidgetRenderer
-                widget={widget}
-                theme={config.theme}
-              />
+              {/* Hidden widgets are unmounted, not just CSS-hidden: autoplaying
+                  audio/video and data polling must stop while a visibility
+                  condition holds the widget off-screen. Reveal remounts the
+                  widget fresh. */}
+              {visible ? (
+                <WidgetRenderer
+                  widget={widget}
+                  theme={config.theme}
+                />
+              ) : null}
             </div>
           );
         })}

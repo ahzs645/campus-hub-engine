@@ -4,6 +4,7 @@ import type { CSSProperties } from 'react';
 import { GridStack, GridStackNode, GridItemHTMLElement } from 'gridstack';
 import 'gridstack/dist/gridstack.min.css';
 import { GridderGridStackEngine } from './GridderGridStackEngine';
+import { OverlapGridStackEngine } from './OverlapGridStackEngine';
 import { getContentScaleStyle } from '../lib/display-preview';
 
 export interface GridStackItem {
@@ -12,6 +13,7 @@ export interface GridStackItem {
   y: number;
   w: number;
   h: number;
+  zIndex?: number;
   minW?: number;
   minH?: number;
   maxW?: number;
@@ -22,14 +24,20 @@ export interface GridStackWrapperRef {
   getItems: () => GridStackItem[];
 }
 
-interface GridStackWrapperProps {
+export type GridInteractionMode = 'default' | 'gridder' | 'overlap';
+
+export interface GridStackWrapperProps {
   items: GridStackItem[];
   columns?: number;
   rows?: number;
   cellHeight?: number | string;
   margin?: number;
   contentScale?: number;
+  interactionMode?: GridInteractionMode;
+  /** @deprecated Use interactionMode instead. */
   swapMode?: 'default' | 'gridder';
+  selectedItemId?: string | null;
+  onItemSelect?: (id: string) => void;
   onLayoutChange?: (items: GridStackItem[]) => void;
   renderItem: (item: GridStackItem) => ReactNode;
 }
@@ -42,17 +50,23 @@ const GridStackWrapper = forwardRef<GridStackWrapperRef, GridStackWrapperProps>(
     cellHeight = 'auto',
     margin = 8,
     contentScale,
-    swapMode = 'default',
+    interactionMode,
+    swapMode,
+    selectedItemId,
+    onItemSelect,
     onLayoutChange,
     renderItem,
   }, ref) => {
     const gridRef = useRef<HTMLDivElement>(null);
     const gridInstanceRef = useRef<GridStack | null>(null);
+    const itemsRef = useRef(items);
     const onLayoutChangeRef = useRef(onLayoutChange);
     const isSyncingRef = useRef(false);
 
     // Keep callback ref updated
+    itemsRef.current = items;
     onLayoutChangeRef.current = onLayoutChange;
+    const resolvedInteractionMode = interactionMode ?? swapMode ?? 'default';
 
     // Initialize GridStack
     useEffect(() => {
@@ -69,7 +83,12 @@ const GridStackWrapper = forwardRef<GridStackWrapperRef, GridStackWrapperProps>(
           cellHeight,
           margin,
           float: true, // Allow widgets to float (not stack)
-          engineClass: swapMode === 'gridder' ? GridderGridStackEngine : undefined,
+          engineClass:
+            resolvedInteractionMode === 'gridder'
+              ? GridderGridStackEngine
+              : resolvedInteractionMode === 'overlap'
+                ? OverlapGridStackEngine
+                : undefined,
           animate: true,
           draggable: {
             handle: '.gs-drag-handle',
@@ -104,12 +123,16 @@ const GridStackWrapper = forwardRef<GridStackWrapperRef, GridStackWrapperProps>(
 
         changeTimeout = setTimeout(() => {
           if (onLayoutChangeRef.current && changedItems) {
+            const itemsById = new Map(
+              itemsRef.current.map((item) => [item.id, item]),
+            );
             const allItems = grid.engine.nodes.map((node: GridStackNode) => ({
               id: node.id as string,
               x: node.x ?? 0,
               y: node.y ?? 0,
               w: node.w ?? 1,
               h: node.h ?? 1,
+              zIndex: itemsById.get(String(node.id))?.zIndex,
             }));
             onLayoutChangeRef.current(allItems);
           }
@@ -121,7 +144,7 @@ const GridStackWrapper = forwardRef<GridStackWrapperRef, GridStackWrapperProps>(
         grid.destroy(false);
         gridInstanceRef.current = null;
       };
-    }, [columns, rows, cellHeight, margin, swapMode]);
+    }, [columns, rows, cellHeight, margin, resolvedInteractionMode]);
 
     // Sync widgets with GridStack when items change (add/remove/update)
     useEffect(() => {
@@ -195,12 +218,16 @@ const GridStackWrapper = forwardRef<GridStackWrapperRef, GridStackWrapperProps>(
         const grid = gridInstanceRef.current;
         if (!grid) return [];
 
+        const itemsById = new Map(
+          itemsRef.current.map((item) => [item.id, item]),
+        );
         return grid.engine.nodes.map((node: GridStackNode) => ({
           id: node.id as string,
           x: node.x ?? 0,
           y: node.y ?? 0,
           w: node.w ?? 1,
           h: node.h ?? 1,
+          zIndex: itemsById.get(String(node.id))?.zIndex,
         }));
       },
     }));
@@ -217,8 +244,9 @@ const GridStackWrapper = forwardRef<GridStackWrapperRef, GridStackWrapperProps>(
         }
       >
         <div ref={gridRef} className="grid-stack">
-          {items.map((item) => {
+          {items.map((item, index) => {
             const isCompact = item.w <= 2 || item.h <= 1;
+            const isSelected = selectedItemId === item.id;
             return (
             <div
               key={item.id}
@@ -232,6 +260,8 @@ const GridStackWrapper = forwardRef<GridStackWrapperRef, GridStackWrapperProps>(
               gs-min-h={item.minH}
               gs-max-w={item.maxW}
               gs-max-h={item.maxH}
+              style={{ zIndex: isSelected ? 1000 : item.zIndex ?? index }}
+              onPointerDown={() => onItemSelect?.(item.id)}
             >
               <div className="grid-stack-item-content">
                 {contentScale && contentScale !== 1 ? (

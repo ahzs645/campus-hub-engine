@@ -9,7 +9,14 @@ export {
   type WidgetEditDialogProps,
   type WidgetEditPanelProps,
 } from './components/WidgetEditDialog';
-export { default as GridStackWrapper, type GridStackItem, type GridStackWrapperRef } from './components/GridStackWrapper';
+export {
+  default as GridStackWrapper,
+  type GridInteractionMode,
+  type GridStackItem,
+  type GridStackWrapperProps,
+  type GridStackWrapperRef,
+} from './components/GridStackWrapper';
+export { OverlapGridStackEngine } from './components/OverlapGridStackEngine';
 
 // === Re-export SDK (backward compatibility) ===
 export {

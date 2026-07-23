@@ -94,10 +94,21 @@ export function Configurator({
         h: def.defaultH,
         props: buildWidgetInitialProps(def),
       };
-      setConfig((prev) => ({
-        ...prev,
-        layout: [...prev.layout, newWidget],
-      }));
+      setConfig((prev) => {
+        const nextZIndex =
+          Math.max(
+            -1,
+            ...prev.layout.map((widget, index) =>
+              typeof widget.zIndex === 'number' && Number.isFinite(widget.zIndex)
+                ? Math.trunc(widget.zIndex)
+                : index
+            ),
+          ) + 1;
+        return {
+          ...prev,
+          layout: [...prev.layout, { ...newWidget, zIndex: nextZIndex }],
+        };
+      });
     },
     []
   );
@@ -169,7 +180,7 @@ export function Configurator({
           {/* Simple absolute-positioned layout for now */}
           {/* Full GridStack integration can be added by consumers or via a separate GridConfigurator component */}
           <div className="relative w-full h-full">
-            {config.layout.map((widget) => {
+            {config.layout.map((widget, index) => {
               const cols = config.gridCols ?? 12;
               const rows = config.gridRows ?? 8;
               return (
@@ -177,6 +188,10 @@ export function Configurator({
                   key={widget.id}
                   className="absolute group cursor-pointer"
                   style={{
+                    zIndex:
+                      editingWidget === widget.id
+                        ? 1000
+                        : widget.zIndex ?? index,
                     left: `${(widget.x / cols) * 100}%`,
                     top: `${(widget.y / rows) * 100}%`,
                     width: `${(widget.w / cols) * 100}%`,
