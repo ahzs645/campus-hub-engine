@@ -204,7 +204,7 @@ export function Configurator({
                     <WidgetRenderer
                       widget={widget}
                       theme={config.theme}
-
+                      previewComingSoon
                     />
                   </div>
                   {widget.visibilityCondition && (
