@@ -2,7 +2,9 @@ import type { ComponentType } from 'react';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-type Loader = () => Promise<{ default: ComponentType<never> }>;
+/** Props the mocked registry hands to a widget. */
+type StubProps = Record<string, unknown>;
+type Loader = () => Promise<{ default: ComponentType<StubProps> }>;
 
 // vi.mock factories are hoisted above imports, so anything they close over has
 // to be hoisted too.
@@ -15,16 +17,16 @@ const { registry, loadCounts } = vi.hoisted(() => ({
 // module does not pull the whole widget SDK into the test.
 vi.mock('../lib/display-widget-components', async () => {
   const { lazy, Suspense, createElement } = await import('react');
-  const cache = new Map<string, ComponentType<never>>();
+  const cache = new Map<string, ComponentType<StubProps>>();
   return {
-    DISPLAY_WIDGET_COMPONENTS: new Proxy({} as Record<string, ComponentType<never>>, {
+    DISPLAY_WIDGET_COMPONENTS: new Proxy({} as Record<string, ComponentType<StubProps>>, {
       get(_target, type: string) {
         const loader = registry.get(type);
         if (!loader) return undefined;
         if (!cache.has(type)) {
           const Lazy = lazy(loader);
-          cache.set(type, ((props: never) =>
-            createElement(Suspense, { fallback: null }, createElement(Lazy, props))) as never);
+          cache.set(type, (props: StubProps) =>
+            createElement(Suspense, { fallback: null }, createElement(Lazy, props)));
         }
         return cache.get(type);
       },
@@ -52,7 +54,7 @@ beforeEach(() => {
   for (const type of TYPES) {
     registry.set(type, async () => {
       loadCounts.set(type, (loadCounts.get(type) ?? 0) + 1);
-      return { default: Live as ComponentType<never> };
+      return { default: Live as unknown as ComponentType<StubProps> };
     });
   }
 });
