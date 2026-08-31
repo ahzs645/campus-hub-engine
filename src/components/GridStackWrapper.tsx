@@ -96,7 +96,12 @@ const GridStackWrapper = forwardRef<GridStackWrapperRef, GridStackWrapperProps>(
           },
           resizable: {
             handles: 'n,ne,e,se,s,sw,w,nw', // All handles for full resize control
-            autoHide: true,
+            // autoHide re-shows handles only on mouseover, an event touch
+            // never fires — keep it for mouse, disable on coarse pointers.
+            autoHide: !(
+              typeof window !== 'undefined' &&
+              window.matchMedia('(pointer: coarse)').matches
+            ),
           },
           cellHeightThrottle: 100,
         },
