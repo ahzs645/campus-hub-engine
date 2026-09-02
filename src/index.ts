@@ -10,6 +10,10 @@ export {
   type WidgetEditPanelProps,
 } from './components/WidgetEditDialog';
 export {
+  WidgetLivePreview,
+  type WidgetLivePreviewProps,
+} from './components/WidgetLivePreview';
+export {
   default as GridStackWrapper,
   type GridInteractionMode,
   type GridStackItem,
