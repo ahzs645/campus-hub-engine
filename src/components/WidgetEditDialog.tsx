@@ -3,12 +3,15 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   getWidget,
   AppIcon,
+  HostRendersPreviewProvider,
   SchemaOptionsForm,
   describeCapabilities,
   isVisibilitySignalKey,
   meetsRequirement,
   parseVisibilityScalar,
 } from '@firstform/campus-hub-widget-sdk';
+import { WidgetLivePreview } from './WidgetLivePreview';
+import type { EngineTheme } from '../lib/ThemeContext';
 import type {
   LinkedSource,
   SimpleVisibilityCondition,
@@ -45,6 +48,11 @@ export interface WidgetEditDialogProps {
   sources?: ContentSource[];
   /** Optional accent color override — falls back to var(--color-accent) */
   accentColor?: string;
+  /**
+   * Template theme the preview renders the widget with. Falls back to the
+   * surrounding EngineThemeProvider.
+   */
+  theme?: EngineTheme;
   /** Optional: host-provided navigation to a linked source's detail view */
   onViewSource?: (sourceId: string) => void;
 }
@@ -62,6 +70,7 @@ export default function WidgetEditDialog({
   onClose,
   sources,
   accentColor,
+  theme,
   onViewSource,
 }: WidgetEditDialogProps) {
   if (!isOpen) return null;
@@ -75,6 +84,7 @@ export default function WidgetEditDialog({
       initialVisibilityCondition={initialVisibilityCondition}
       sources={sources}
       accentColor={accentColor}
+      theme={theme}
       onSave={onSave}
       onClose={onClose}
       onViewSource={onViewSource}
@@ -97,6 +107,7 @@ function WidgetEditForm({
   onClose,
   sources,
   accentColor,
+  theme,
   onViewSource,
   presentation,
 }: WidgetEditPanelProps & { presentation: 'dialog' | 'panel' }) {
@@ -434,15 +445,25 @@ function WidgetEditForm({
           />
         )}
 
-        {OptionsComponent ? (
-          <OptionsComponent data={data} onChange={handleChange} linkedSource={linkedSource} />
-        ) : optionsSchema && optionsSchema.length > 0 ? (
-          <SchemaOptionsForm schema={optionsSchema} data={data} onChange={handleChange} />
-        ) : (
-          <div className="text-center py-8 text-[var(--ui-text-muted)]">
-            <p>No additional configuration options available for this widget.</p>
-          </div>
-        )}
+        {/* Inside this provider a widget's own OptionsPreview renders nothing:
+            the panel previews the real widget below, so a widget that still
+            carries a hand-written mock-up never shows two previews at once. */}
+        <HostRendersPreviewProvider>
+          {OptionsComponent ? (
+            <OptionsComponent data={data} onChange={handleChange} linkedSource={linkedSource} />
+          ) : optionsSchema && optionsSchema.length > 0 ? (
+            <SchemaOptionsForm schema={optionsSchema} data={data} onChange={handleChange} />
+          ) : (
+            <div className="text-center py-8 text-[var(--ui-text-muted)]">
+              <p>No additional configuration options available for this widget.</p>
+            </div>
+          )}
+        </HostRendersPreviewProvider>
+
+        {/* One preview for every widget, rendered from the live form state.
+            Widgets used to hand-write their own mock-up here, which only half
+            of them did and none of them kept in step with the real thing. */}
+        <WidgetLivePreview widgetType={widgetType} data={data} theme={theme} />
       </div>
 
       {/* Footer */}
