@@ -4,6 +4,7 @@ import {
   getWidget,
   AppIcon,
   HostRendersPreviewProvider,
+  NestedWidgetEditorProvider,
   SchemaOptionsForm,
   describeCapabilities,
   isVisibilitySignalKey,
@@ -14,10 +15,18 @@ import { WidgetLivePreview } from './WidgetLivePreview';
 import type { EngineTheme } from '../lib/ThemeContext';
 import type {
   LinkedSource,
+  NestedWidgetEditRequest,
   SimpleVisibilityCondition,
   SourceBinding,
   SourceCapabilities,
 } from '@firstform/campus-hub-widget-sdk';
+
+/**
+ * Reserve the scrollbar's column even while nothing scrolls. Without it the
+ * whole form shifts left by a scrollbar's width the moment an expanding
+ * section (a picker, a child widget's options) makes the panel overflow.
+ */
+const SCROLL_BODY_STYLE: React.CSSProperties = { scrollbarGutter: 'stable' };
 
 export interface ContentSource {
   _id: string;
@@ -135,9 +144,22 @@ function WidgetEditForm({
   );
   const dialogRef = useRef<HTMLDialogElement>(null);
 
+  // Drill-in editor for a child of a container widget (Widget Stack). The
+  // container's options UI asks for it through the SDK's nested-editor
+  // context; while it is open the container's own form stays mounted but
+  // hidden, so its state (expanded rows, scroll position) survives the trip.
+  const [nestedEdit, setNestedEdit] = useState<NestedWidgetEditRequest | null>(null);
+  const [nestedData, setNestedData] = useState<Record<string, unknown>>({});
+
   const widgetDef = getWidget(widgetType);
   const OptionsComponent = widgetDef?.OptionsComponent;
   const optionsSchema = widgetDef?.optionsSchema;
+  const nestedDef = nestedEdit ? getWidget(nestedEdit.widgetType) : undefined;
+  const NestedOptionsComponent = nestedDef?.OptionsComponent;
+  const nestedSourceRef = nestedData.__sourceRef as { sourceId?: string; propName?: string } | undefined;
+  const nestedLinkedSource = nestedSourceRef?.sourceId
+    ? (sources?.find((s) => s._id === nestedSourceRef.sourceId) as LinkedSource | undefined)
+    : undefined;
 
   // Resolve the currently-linked library source (if any) so options UIs can
   // reflect it — the picker writes `__sourceRef` when a source is linked.
@@ -164,6 +186,7 @@ function WidgetEditForm({
       initialVisibilityCondition?.behavior ?? 'while-matched',
     );
     setAutoHideSeconds(initialVisibilityCondition?.autoHideSeconds ?? 15);
+    setNestedEdit(null);
   }, [
     widgetId,
     initialData,
@@ -188,6 +211,24 @@ function WidgetEditForm({
   const handleChange = useCallback((newData: Record<string, unknown>) => {
     setData(newData);
   }, []);
+
+  const openNestedEditor = useCallback((request: NestedWidgetEditRequest) => {
+    // An unregistered child type has nothing to edit; leave the container's
+    // own fallback (or nothing) in place.
+    if (!getWidget(request.widgetType)) return;
+    setNestedData(request.data ?? {});
+    setNestedEdit(request);
+  }, []);
+
+  const closeNestedEditor = useCallback(() => {
+    setNestedEdit(null);
+  }, []);
+
+  const applyNestedEditor = useCallback(() => {
+    if (!nestedEdit) return;
+    nestedEdit.onApply(nestedData);
+    setNestedEdit(null);
+  }, [nestedData, nestedEdit]);
 
   const handleSave = useCallback(() => {
     const trimmedSignalKey = signalKey.trim();
@@ -246,6 +287,10 @@ function WidgetEditForm({
     ? { '--color-accent': accentColor, '--ui-switch-on': accentColor } as React.CSSProperties
     : undefined;
 
+  const scrollBodyClassName = isDialog
+    ? 'flex-1 overflow-y-auto p-6 space-y-6'
+    : 'flex-1 overflow-y-auto p-4 space-y-5';
+
   const content = (
     <div
       className={
@@ -258,17 +303,46 @@ function WidgetEditForm({
       {/* Header */}
       <div className="flex-shrink-0 px-5 py-4 border-b border-[color:var(--ui-panel-border)]">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-[color:var(--ui-item-border)] bg-[var(--ui-item-bg)]">
-              <AppIcon name={widgetDef.icon} className="w-5 h-5 text-[var(--ui-text)]" />
-            </span>
-            <div className="min-w-0">
-              <h2 className={isDialog ? 'text-xl font-bold text-[var(--ui-text)]' : 'text-sm font-semibold text-[var(--ui-text)]'}>
-                {isDialog ? `Configure ${widgetDef.name}` : widgetDef.name}
-              </h2>
-              <p className="mt-1 text-xs leading-5 text-[var(--ui-text-muted)]">{widgetDef.description}</p>
+          {nestedEdit && nestedDef ? (
+            <div className="flex min-w-0 items-start gap-2">
+              <button
+                type="button"
+                onClick={closeNestedEditor}
+                className="-ml-2 p-2 rounded-lg transition-colors text-[var(--ui-text-muted)] hover:bg-[var(--ui-item-hover)] hover:text-[var(--ui-text)]"
+                aria-label={`Back to ${widgetDef.name}`}
+                title={`Back to ${widgetDef.name}`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-[color:var(--ui-item-border)] bg-[var(--ui-item-bg)]">
+                <AppIcon name={nestedDef.icon} className="w-5 h-5 text-[var(--ui-text)]" />
+              </span>
+              <div className="min-w-0">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-[var(--ui-text-muted)]">
+                  {widgetDef.name}
+                  {nestedEdit.context ? ` · ${nestedEdit.context}` : ''}
+                </div>
+                <h2 className={isDialog ? 'text-xl font-bold text-[var(--ui-text)]' : 'text-sm font-semibold text-[var(--ui-text)]'}>
+                  {nestedDef.name}
+                </h2>
+                <p className="mt-1 text-xs leading-5 text-[var(--ui-text-muted)]">{nestedDef.description}</p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-[color:var(--ui-item-border)] bg-[var(--ui-item-bg)]">
+                <AppIcon name={widgetDef.icon} className="w-5 h-5 text-[var(--ui-text)]" />
+              </span>
+              <div className="min-w-0">
+                <h2 className={isDialog ? 'text-xl font-bold text-[var(--ui-text)]' : 'text-sm font-semibold text-[var(--ui-text)]'}>
+                  {isDialog ? `Configure ${widgetDef.name}` : widgetDef.name}
+                </h2>
+                <p className="mt-1 text-xs leading-5 text-[var(--ui-text-muted)]">{widgetDef.description}</p>
+              </div>
+            </div>
+          )}
           <button
             onClick={onClose}
             className="p-2 rounded-lg transition-colors text-[var(--ui-text-muted)] hover:bg-[var(--ui-item-hover)]"
@@ -282,8 +356,13 @@ function WidgetEditForm({
         </div>
       </div>
 
-      {/* Content - Scrollable */}
-      <div className={isDialog ? 'flex-1 overflow-y-auto p-6 space-y-6' : 'flex-1 overflow-y-auto p-4 space-y-5'}>
+      {/* Content - Scrollable. The gutter is reserved up front so the form
+          does not jump sideways the moment it grows tall enough to scroll. */}
+      <div
+        className={scrollBodyClassName}
+        style={SCROLL_BODY_STYLE}
+        hidden={nestedEdit !== null}
+      >
         {/* Coming Soon Toggle */}
         <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-[var(--ui-item-bg)] border border-[color:var(--ui-item-border)]">
           <div>
@@ -449,15 +528,17 @@ function WidgetEditForm({
             the panel previews the real widget below, so a widget that still
             carries a hand-written mock-up never shows two previews at once. */}
         <HostRendersPreviewProvider>
-          {OptionsComponent ? (
-            <OptionsComponent data={data} onChange={handleChange} linkedSource={linkedSource} />
-          ) : optionsSchema && optionsSchema.length > 0 ? (
-            <SchemaOptionsForm schema={optionsSchema} data={data} onChange={handleChange} />
-          ) : (
-            <div className="text-center py-8 text-[var(--ui-text-muted)]">
-              <p>No additional configuration options available for this widget.</p>
-            </div>
-          )}
+          <NestedWidgetEditorProvider value={openNestedEditor}>
+            {OptionsComponent ? (
+              <OptionsComponent data={data} onChange={handleChange} linkedSource={linkedSource} />
+            ) : optionsSchema && optionsSchema.length > 0 ? (
+              <SchemaOptionsForm schema={optionsSchema} data={data} onChange={handleChange} />
+            ) : (
+              <div className="text-center py-8 text-[var(--ui-text-muted)]">
+                <p>No additional configuration options available for this widget.</p>
+              </div>
+            )}
+          </NestedWidgetEditorProvider>
         </HostRendersPreviewProvider>
 
         {/* One preview for every widget, rendered from the live form state.
@@ -466,22 +547,83 @@ function WidgetEditForm({
         <WidgetLivePreview widgetType={widgetType} data={data} theme={theme} />
       </div>
 
+      {/* Nested child editor: the same surface a top-level widget gets
+          (data sources, options form, live preview), for one child of a
+          container widget. Deliberately outside the nested-editor provider so
+          a container inside a container falls back to inline options rather
+          than drilling in without end. */}
+      {nestedEdit && nestedDef && (
+        <div className={scrollBodyClassName} style={SCROLL_BODY_STYLE}>
+          {sources && sources.length > 0 && nestedDef.acceptsSources && nestedDef.acceptsSources.length > 0 && (
+            <SourcePicker
+              bindings={nestedDef.acceptsSources}
+              sources={sources}
+              data={nestedData}
+              onChange={setNestedData}
+              onViewSource={onViewSource}
+            />
+          )}
+
+          <HostRendersPreviewProvider>
+            {NestedOptionsComponent ? (
+              <NestedOptionsComponent
+                data={nestedData}
+                onChange={setNestedData}
+                linkedSource={nestedLinkedSource}
+              />
+            ) : nestedDef.optionsSchema && nestedDef.optionsSchema.length > 0 ? (
+              <SchemaOptionsForm
+                schema={nestedDef.optionsSchema}
+                data={nestedData}
+                onChange={setNestedData}
+              />
+            ) : (
+              <div className="text-center py-8 text-[var(--ui-text-muted)]">
+                <p>No additional configuration options available for this widget.</p>
+              </div>
+            )}
+          </HostRendersPreviewProvider>
+
+          <WidgetLivePreview widgetType={nestedEdit.widgetType} data={nestedData} theme={theme} />
+        </div>
+      )}
+
       {/* Footer */}
       <div className={isDialog ? 'flex-shrink-0 px-6 py-4 border-t border-[color:var(--ui-panel-border)] bg-[var(--ui-item-bg)] rounded-b-xl' : 'flex-shrink-0 px-4 py-3 border-t border-[color:var(--ui-panel-border)] bg-[var(--ui-item-bg)]'}>
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-[var(--ui-text-muted)] bg-[var(--ui-item-bg)] hover:bg-[var(--ui-item-hover)] rounded-lg transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors hover:opacity-90 bg-[var(--color-accent)]"
-          >
-            Save Changes
-          </button>
-        </div>
+        {nestedEdit && nestedDef ? (
+          <div className="flex items-center justify-end gap-3">
+            <span className="mr-auto text-xs text-[var(--ui-text-muted)]">
+              Kept when you save {widgetDef.name}
+            </span>
+            <button
+              onClick={closeNestedEditor}
+              className="px-4 py-2 text-sm font-medium text-[var(--ui-text-muted)] bg-[var(--ui-item-bg)] hover:bg-[var(--ui-item-hover)] rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={applyNestedEditor}
+              className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors hover:opacity-90 bg-[var(--color-accent)]"
+            >
+              Apply
+            </button>
+          </div>
+        ) : (
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-[var(--ui-text-muted)] bg-[var(--ui-item-bg)] hover:bg-[var(--ui-item-hover)] rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors hover:opacity-90 bg-[var(--color-accent)]"
+            >
+              Save Changes
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
