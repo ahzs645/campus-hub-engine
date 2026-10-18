@@ -674,11 +674,11 @@ function SourcePicker({
   const handlePickSource = (binding: SourceBinding, source: ContentSource) => {
     const mappedData = binding.applySource
       ? binding.applySource(source as any, data)
-      : { [binding.propName]: source.url };
+      : binding.mode === 'reference' ? {} : { [binding.propName]: source.url };
     const newData = {
       ...data,
       ...mappedData,
-      __sourceRef: { sourceId: source._id, propName: binding.propName },
+      __sourceRef: { sourceId: source._id, propName: binding.propName, ...(binding.mode === 'reference' ? { mode: 'reference' } : {}) },
     };
     onChange(newData);
     setExpanded(false);
@@ -793,7 +793,9 @@ function SourcePicker({
       {expanded && (
         <div className="px-4 pb-4 space-y-2 border-t border-[color:var(--ui-item-border)] pt-3">
           <p className="text-xs text-[var(--ui-text-muted)] mb-2">
-            Pick a source from your library to link to this widget. The URL will stay in sync when you update the source.
+            {bindings.every((binding) => binding.mode === 'reference')
+              ? 'Choose a saved source. Changes to its data update this widget.'
+              : 'Pick a source from your library to link to this widget. The URL will stay in sync when you update the source.'}
           </p>
           {hint && (
             <p className="text-xs text-[var(--color-accent)] mb-2">{hint}</p>
