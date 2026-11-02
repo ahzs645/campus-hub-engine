@@ -1,7 +1,17 @@
+import { registerSignalingImplementation } from '@firstform/campus-hub-widget-sdk';
+import { createSignalingClient as createEngineSignalingClient } from './lib/signaling-client';
+
+// Provide the SDK's createSignalingClient with this engine's implementation.
+// Widgets reach signaling through the SDK so they never depend on the engine.
+registerSignalingImplementation(createEngineSignalingClient);
+
 // === Core Components ===
 export { DisplayRenderer } from './components/DisplayRenderer';
-export { Configurator } from './components/Configurator';
 export { default as WidgetRenderer } from './components/WidgetRenderer';
+export {
+  WidgetErrorBoundary,
+  DEFAULT_WIDGET_RETRY_DELAY_MS,
+} from './components/WidgetErrorBoundary';
 export {
   default as WidgetEditDialog,
   WidgetEditPanel,
@@ -105,6 +115,7 @@ export {
 // === Display Widget Components (lazy loaded) ===
 export {
   DISPLAY_WIDGET_COMPONENTS,
+  invalidateDisplayWidgetComponent,
   preloadDisplayWidgetComponent,
 } from './lib/display-widget-components';
 
