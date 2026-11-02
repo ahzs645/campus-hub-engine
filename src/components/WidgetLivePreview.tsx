@@ -44,6 +44,13 @@ const STATIC_PREVIEW_TYPES = new Set([
 ]);
 
 const MIN_STAGE_HEIGHT = 96;
+/**
+ * Banner-shaped widgets (a 12x1 ticker is ~14:1) get a shorter floor. Holding
+ * them to MIN_STAGE_HEIGHT made the widget render only ~450 of its ~1920
+ * reference pixels wide, so a ticker previewed as nothing but its label.
+ */
+const MIN_WIDE_STAGE_HEIGHT = 48;
+const WIDE_ASPECT = 4;
 const MAX_STAGE_HEIGHT = 260;
 /** Used until the frame reports a width (first paint, or no ResizeObserver). */
 const FALLBACK_FRAME_WIDTH = 320;
@@ -137,9 +144,10 @@ export function WidgetLivePreview({ widgetType, data, theme }: WidgetLivePreview
   const isStatic = STATIC_PREVIEW_TYPES.has(widgetType);
   const aspect = stageAspectRatio(widgetDef.defaultW, widgetDef.defaultH);
   const availableWidth = frameWidth || FALLBACK_FRAME_WIDTH;
+  const minStageHeight = aspect > WIDE_ASPECT ? MIN_WIDE_STAGE_HEIGHT : MIN_STAGE_HEIGHT;
   const stageHeight = Math.min(
     MAX_STAGE_HEIGHT,
-    Math.max(MIN_STAGE_HEIGHT, availableWidth / aspect),
+    Math.max(minStageHeight, availableWidth / aspect),
   );
   const stageWidth = Math.min(availableWidth, stageHeight * aspect);
   // The widget renders at reference-display size and is scaled into the stage,
