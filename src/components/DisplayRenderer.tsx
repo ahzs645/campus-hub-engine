@@ -6,12 +6,12 @@
  * widget grid layout. No iframe needed.
  *
  * Usage:
- *   import { DisplayRenderer } from '@campus-hub/engine'
+ *   import { DisplayRenderer } from '@firstform/campus-hub-engine'
  *   <DisplayRenderer config={config} />
  */
 import { useMemo, useRef, useEffect, useLayoutEffect, useState } from 'react';
 import type { VisibilitySignal } from '@firstform/campus-hub-widget-sdk';
-import type { WidgetConfig } from '../lib/config';
+import type { LogoConfig, WidgetConfig } from '../lib/config';
 import { normalizeConfig, DEFAULT_CONFIG } from '../lib/config';
 import { useWidgetVisibility } from '../lib/widget-visibility';
 import WidgetRenderer from './WidgetRenderer';
@@ -23,10 +23,11 @@ interface DisplayRendererProps {
   config: unknown;
   /** Optional CSS class for the outer container */
   className?: string;
-  /** Reference width for scaling (default 1920) */
+  /**
+   * Reference width for scaling (default 1920). The reference height follows
+   * from the config's aspect ratio.
+   */
   designWidth?: number;
-  /** Reference height for scaling (default 1080) */
-  designHeight?: number;
   /** Runtime signals. Undefined keeps all widgets visible for editing/previews. */
   visibilitySignals?: readonly VisibilitySignal[];
 }
@@ -35,7 +36,6 @@ export function DisplayRenderer({
   config: rawConfig,
   className,
   designWidth = 1920,
-  designHeight = 1080,
   visibilitySignals,
 }: DisplayRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -134,6 +134,16 @@ export function DisplayRenderer({
           visibility: scale === null ? 'hidden' : 'visible',
         }}
       >
+        <div
+          data-coming-soon-veil={config.comingSoon ? 'true' : undefined}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            ...(config.comingSoon
+              ? { filter: 'blur(8px) grayscale(1)', pointerEvents: 'none', userSelect: 'none' }
+              : null),
+          }}
+        >
         {config.layout.map((widget: WidgetConfig, index) => {
           const visible =
             widgetVisibility.get(widget.id) ??
@@ -167,7 +177,67 @@ export function DisplayRenderer({
             </div>
           );
         })}
+        </div>
+        {config.comingSoon && (
+          <ComingSoonOverlay theme={config.theme} logo={config.logo} />
+        )}
       </div>
+    </div>
+  );
+}
+
+function logoSrc(logo: LogoConfig): string {
+  // Raw SVG is rendered through <img>, which never runs scripts or loads
+  // external resources from inside the SVG.
+  return logo.type === 'svg'
+    ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(logo.value)}`
+    : logo.value;
+}
+
+/** Display-level "Coming Soon" holding screen over the blurred layout. */
+function ComingSoonOverlay({
+  theme,
+  logo,
+}: {
+  theme: { primary: string; accent: string; background: string };
+  logo?: LogoConfig;
+}) {
+  return (
+    <div
+      role="status"
+      style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 10000,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 32,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      }}
+    >
+      {logo?.value && (
+        <img
+          src={logoSrc(logo)}
+          alt=""
+          style={{ maxWidth: '30%', maxHeight: 180, objectFit: 'contain' }}
+        />
+      )}
+      <span
+        style={{
+          color: theme.accent,
+          backgroundColor: `${theme.primary}80`,
+          fontSize: 48,
+          fontWeight: 700,
+          letterSpacing: '0.2em',
+          textTransform: 'uppercase',
+          padding: '16px 40px',
+          borderRadius: 24,
+        }}
+      >
+        Coming Soon
+      </span>
     </div>
   );
 }

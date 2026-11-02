@@ -1,4 +1,10 @@
 // Widget Registry Index - Import all widget packages to register them
+//
+// Convenience entry for hosts without the SDK's `campusHubWidgets()` Vite
+// discovery plugin (the Next.js campus-hub app aliases
+// `@firstform/campus-hub-engine/widgets` to this file). The widget packages
+// are supplied by that host and are not dependencies of the engine; hosts using
+// the discovery plugin should not import this file.
 
 // Import widget packages (side-effect: triggers registerWidget + registerWidgetLoader calls)
 import '@firstform/campus-hub-widgets-time';

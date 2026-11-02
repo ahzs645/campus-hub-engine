@@ -52,6 +52,17 @@ export const DISPLAY_WIDGET_COMPONENTS: Record<string, DisplayWidgetComponent> =
   }
 );
 
+/**
+ * Forget the cached lazy wrapper for a widget type, so the next render creates
+ * a fresh `React.lazy` and calls the loader again. `React.lazy` caches a
+ * rejected import for the lifetime of the wrapper, so without this a chunk that
+ * failed once (a network blip, a deploy that replaced the chunk) would stay
+ * failed until the page reloads.
+ */
+export function invalidateDisplayWidgetComponent(type: string): void {
+  lazyCache.delete(type);
+}
+
 export function preloadDisplayWidgetComponent(type: string): void {
   const loader = getWidgetLoader(type);
   if (!loader) return;

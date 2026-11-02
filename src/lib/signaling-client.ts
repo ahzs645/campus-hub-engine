@@ -47,14 +47,24 @@ function createSignalingClient(
   serverUrl: string,
   role: Role,
   displayId: string,
-  options: { name?: string; currentConfig?: string; autoReconnect?: boolean } = {}
+  options: { name?: string; currentConfig?: string; autoReconnect?: boolean; authToken?: string } = {}
 ): SignalingClient {
-  const { name, currentConfig, autoReconnect = true } = options;
+  const { name, currentConfig, autoReconnect = true, authToken } = options;
 
   const listeners = new Map<string, Set<EventCallback>>();
   let socket: ReturnType<typeof import("socket.io-client").io> | null = null;
   let connected = false;
   let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  // Bumped by every connect()/disconnect() so a connect() whose async
+  // socket.io-client import resolves after a disconnect() (or a newer
+  // connect()) knows it has been superseded and must not open a socket.
+  let generation = 0;
+  let connecting = false;
+
+  function stopHeartbeat() {
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+  }
 
   function emit(event: string, data: Record<string, unknown>) {
     const cbs = listeners.get(event);
@@ -71,36 +81,59 @@ function createSignalingClient(
   }
 
   async function connect() {
-    // Dynamic import — socket.io-client is only loaded when signaling is used
-    const { io } = await import("socket.io-client");
+    // Idempotent: a second call while connecting or connected is a no-op.
+    if (socket || connecting) return;
+    connecting = true;
+    const myGeneration = ++generation;
 
-    socket = io(serverUrl, {
+    let io: typeof import("socket.io-client").io;
+    try {
+      // Dynamic import — socket.io-client is only loaded when signaling is used
+      ({ io } = await import("socket.io-client"));
+    } catch (error) {
+      if (myGeneration === generation) connecting = false;
+      emit("error", { message: "Failed to load the signaling client", error: String(error) });
+      return;
+    }
+    // disconnect() (or another connect cycle) ran while we were loading.
+    if (myGeneration !== generation) return;
+    connecting = false;
+
+    const activeSocket = io(serverUrl, {
       reconnection: autoReconnect,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 10000,
       transports: ["websocket", "polling"],
+      ...(authToken ? { auth: { token: authToken } } : {}),
     });
+    socket = activeSocket;
 
-    socket.on("connect", () => {
+    activeSocket.on("connect", () => {
       connected = true;
       emit("connected", {});
 
       if (role === "display") {
-        socket!.emit("register-display", { displayId, name, currentConfig });
-        // Start heartbeat every 30s
+        activeSocket.emit("register-display", { displayId, name, currentConfig });
+        // Heartbeat every 30s; reset on reconnect so intervals never stack.
+        stopHeartbeat();
         heartbeatInterval = setInterval(() => {
-          socket!.emit("display-heartbeat", { displayId });
+          activeSocket.emit("display-heartbeat", { displayId });
         }, 30000);
       } else {
-        socket!.emit("join-display", { displayId });
+        activeSocket.emit("join-display", { displayId });
       }
     });
 
-    socket.on("disconnect", () => {
+    activeSocket.on("disconnect", () => {
       connected = false;
-      if (heartbeatInterval) clearInterval(heartbeatInterval);
+      stopHeartbeat();
       emit("disconnected", {});
+    });
+
+    // Handshake rejections (e.g. a missing or wrong auth token) arrive here.
+    activeSocket.on("connect_error", (error: Error) => {
+      emit("error", { message: error.message });
     });
 
     // Forward server events to listeners
@@ -121,15 +154,22 @@ function createSignalingClient(
     ];
 
     for (const event of forwardEvents) {
-      socket.on(event, (data: Record<string, unknown>) => emit(event, data));
+      activeSocket.on(event, (data: Record<string, unknown>) => emit(event, data));
     }
   }
 
   function disconnect() {
-    if (heartbeatInterval) clearInterval(heartbeatInterval);
-    socket?.disconnect();
+    generation++;
+    connecting = false;
+    stopHeartbeat();
+    const activeSocket = socket;
     socket = null;
     connected = false;
+    if (activeSocket) {
+      activeSocket.removeAllListeners();
+      activeSocket.disconnect();
+    }
+    listeners.clear();
   }
 
   function pushConfig(config: SignalingConfig) {

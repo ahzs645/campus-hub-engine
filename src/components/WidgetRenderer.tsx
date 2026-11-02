@@ -1,6 +1,10 @@
-import type { CSSProperties } from 'react';
-import { DISPLAY_WIDGET_COMPONENTS } from '../lib/display-widget-components';
+import { useCallback, useState, type CSSProperties } from 'react';
+import {
+  DISPLAY_WIDGET_COMPONENTS,
+  invalidateDisplayWidgetComponent,
+} from '../lib/display-widget-components';
 import type { WidgetConfig } from '../lib/config';
+import { WidgetErrorBoundary } from './WidgetErrorBoundary';
 
 interface WidgetRendererProps {
   widget: WidgetConfig;
@@ -21,6 +25,11 @@ interface WidgetRendererProps {
    * frame for no one's benefit.
    */
   previewComingSoon?: boolean;
+  /**
+   * Delay before a widget that threw (or whose chunk failed to load) is
+   * retried. Defaults to 60 seconds; 0 disables automatic retries.
+   */
+  retryDelayMs?: number;
 }
 
 function ComingSoonBadge({ theme, veiled }: { theme: WidgetRendererProps['theme']; veiled: boolean }) {
@@ -43,7 +52,17 @@ export default function WidgetRenderer({
   theme,
   corsProxy,
   previewComingSoon = false,
+  retryDelayMs,
 }: WidgetRendererProps) {
+  // Bumped to remount the error boundary (and re-resolve the lazy component)
+  // when a failed widget is retried.
+  const [attempt, setAttempt] = useState(0);
+  const widgetType = widget.type;
+  const retry = useCallback(() => {
+    invalidateDisplayWidgetComponent(widgetType);
+    setAttempt((current) => current + 1);
+  }, [widgetType]);
+
   const placeholderStyle = {
     borderColor: `${theme.accent}40`,
     backgroundColor: `${theme.primary}20`,
@@ -78,7 +97,16 @@ export default function WidgetRenderer({
   return (
     <div className="h-full w-full relative" style={{ '--widget-theme-tint': `${theme.primary}18` } as CSSProperties}>
       <div className={widget.comingSoon ? 'h-full w-full blur-sm grayscale pointer-events-none select-none' : 'h-full w-full'}>
-        <Component config={widget.props} theme={theme} corsProxy={corsProxy} />
+        <WidgetErrorBoundary
+          key={attempt}
+          widgetType={widget.type}
+          theme={theme}
+          resetKey={widget.props}
+          retryDelayMs={retryDelayMs}
+          onRetry={retry}
+        >
+          <Component config={widget.props} theme={theme} corsProxy={corsProxy} />
+        </WidgetErrorBoundary>
       </div>
       {widget.comingSoon && <ComingSoonBadge theme={theme} veiled />}
     </div>
