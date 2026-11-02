@@ -29,6 +29,7 @@ function register(
 
 register('preview-plain', ({ config }) => <div>label is {String(config?.label)}</div>);
 register('web', () => <div>an iframe you did not want</div>);
+register('preview-banner', () => <div>banner body</div>, { defaultW: 12, defaultH: 1 });
 register('preview-throws', () => {
   throw new Error('widget blew up');
 });
@@ -50,6 +51,17 @@ describe('WidgetLivePreview', () => {
     render(<WidgetLivePreview widgetType="preview-plain" data={{ label: 'hello' }} />);
 
     expect(screen.getByText(/label is hello/)).toBeInTheDocument();
+  });
+
+  it('gives banner-shaped widgets a short stage so they render near full width', () => {
+    render(<WidgetLivePreview widgetType="preview-banner" data={{}} />);
+
+    const stage = screen.getByText('banner body').closest('.overflow-hidden') as HTMLElement;
+    // 12x1 on a 16:9, 12x8 reference display is ~14:1. The 96px floor used to
+    // make it render only ~450 of its ~1920 reference pixels wide.
+    expect(stage.style.height).toBe('48px');
+    const scaled = screen.getByText('banner body').parentElement as HTMLElement;
+    expect(parseFloat(scaled.style.width)).toBeGreaterThan(250); // % of the stage
   });
 
   it('stands widgets that load external content down to a static card', () => {
