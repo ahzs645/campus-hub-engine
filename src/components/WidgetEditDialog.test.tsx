@@ -1,9 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import {
   registerWidget,
+  SourcePickerProvider,
   useNestedWidgetEditor,
+  type SourcePickRequest,
   type WidgetOptionsProps,
 } from '@firstform/campus-hub-widget-sdk';
 import { WidgetEditPanel } from './WidgetEditDialog';
@@ -27,7 +29,149 @@ registerWidget({
   }],
 });
 
+registerWidget({
+  type: 'source-picker-image-test', name: 'Image source test', description: 'Needs images',
+  icon: 'carousel', minW: 1, minH: 1, defaultW: 1, defaultH: 1, component: () => null,
+  acceptsSources: [{ propName: 'feedUrl', types: ['feed'], requires: { hasImages: true } }],
+});
+
+registerWidget({
+  type: 'source-picker-slides-test', name: 'Slide sources', description: 'Multiple saved images',
+  icon: 'carousel', minW: 1, minH: 1, defaultW: 1, defaultH: 1, component: () => null,
+  acceptsSources: [{ propName: 'slides', types: ['image'], multiple: true }],
+});
+
 describe('WidgetEditPanel source picker', () => {
+  it('links several sources and unlinks one while keeping manual and other saved slides', async () => {
+    const user = userEvent.setup();
+    const openPicker = vi.fn();
+    const onSave = vi.fn();
+    const manual = { id: 'manual', url: 'data:image/svg+xml,manual' };
+    render(
+      <SourcePickerProvider value={openPicker}>
+        <WidgetEditPanel widgetId="slides" widgetType="source-picker-slides-test" initialData={{ slides: [manual] }}
+          sources={[]} onSave={onSave} onClose={vi.fn()} />
+      </SourcePickerProvider>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Add source' }));
+    act(() => (openPicker.mock.calls[0][0] as SourcePickRequest).onSelect({
+      _id: 'one', name: 'Poster one', sourceType: 'image', url: 'https://example.edu/one.jpg',
+    }));
+    await user.click(screen.getByRole('button', { name: 'Add source' }));
+    act(() => (openPicker.mock.calls[1][0] as SourcePickRequest).onSelect({
+      _id: 'two', name: 'Poster two', sourceType: 'image', url: 'https://example.edu/two.jpg',
+    }));
+    expect(screen.getByText('Poster one')).toBeInTheDocument();
+    expect(screen.getByText('Poster two')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Unlink Poster one' }));
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+    const data = onSave.mock.calls[0][1];
+    expect(data.slides).toEqual([manual, { id: 'two', url: 'https://example.edu/two.jpg' }]);
+    expect(data.__sourceRefs).toEqual([{ sourceId: 'two', propName: 'slides', itemId: 'two', urlProp: 'url' }]);
+  });
+
+  it('can add and immediately link the first source without losing the widget draft', async () => {
+    const user = userEvent.setup();
+    const openPicker = vi.fn();
+    const onSave = vi.fn();
+    render(
+      <SourcePickerProvider value={openPicker}>
+        <WidgetEditPanel widgetId="first" widgetType="source-picker-test" initialData={{ title: 'My draft' }}
+          sources={[]} onSave={onSave} onClose={vi.fn()} />
+      </SourcePickerProvider>,
+    );
+
+    expect(screen.getByText('No compatible sources saved yet.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Add source' }));
+    const request = openPicker.mock.calls[0][0] as SourcePickRequest;
+    expect(request).toMatchObject({ widgetType: 'source-picker-test', initialTab: 'create' });
+    act(() => request.onSelect({
+      _id: 'new-source', name: 'New campus source', sourceType: 'api', url: 'https://example.edu/data',
+    }));
+
+    // The supplied sources list is still empty: the returned saved source is enough.
+    expect(screen.getByText('New campus source')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+    expect(onSave.mock.calls[0][1]).toEqual({
+      title: 'My draft', apiUrl: 'https://example.edu/data',
+      __sourceRef: { sourceId: 'new-source', propName: 'apiUrl' },
+    });
+  });
+
+  it('opens the same host picker at the store and preserves the draft when it is cancelled', async () => {
+    const user = userEvent.setup();
+    const openPicker = vi.fn();
+    const onSave = vi.fn();
+    render(
+      <SourcePickerProvider value={openPicker}>
+        <WidgetEditPanel widgetId="first" widgetType="source-picker-test" initialData={{ title: 'My draft' }}
+          sources={[]} onSave={onSave} onClose={vi.fn()} />
+      </SourcePickerProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Browse source store' }));
+    expect(openPicker.mock.calls[0][0]).toMatchObject({ initialTab: 'store' });
+    // Cancellation calls no onSelect; all existing form state remains intact.
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+    expect(onSave.mock.calls[0][1]).toEqual({ title: 'My draft' });
+  });
+
+  it('rejects known incompatible sources from both the list and a host picker callback', async () => {
+    const user = userEvent.setup();
+    const openPicker = vi.fn();
+    const onSave = vi.fn();
+    const textOnly = {
+      _id: 'text', name: 'Text only news', sourceType: 'feed' as const, url: 'https://example.edu/feed',
+      capabilities: { format: 'rss' as const, hasImages: false, hasText: true, hasDates: true,
+        hasLinks: true, fields: [], detectedAt: 1 },
+    };
+    render(
+      <SourcePickerProvider value={openPicker}>
+        <WidgetEditPanel widgetId="image" widgetType="source-picker-image-test" initialData={{}}
+          sources={[textOnly]} onSave={onSave} onClose={vi.fn()} />
+      </SourcePickerProvider>,
+    );
+
+    expect(screen.getByRole('button', { name: /Text only news/ })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Add source' }));
+    act(() => (openPicker.mock.calls[0][0] as SourcePickRequest).onSelect(textOnly));
+    expect(screen.getByRole('alert')).toHaveTextContent(/No images/i);
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+    expect(onSave.mock.calls[0][1]).toEqual({});
+  });
+
+  it('clears the copied endpoint when unlinking, including a deleted library source', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(<WidgetEditPanel widgetId="old" widgetType="source-picker-test" sources={[]}
+      initialData={{ apiUrl: 'https://example.edu/old', title: 'Keep me',
+        __sourceRef: { sourceId: 'deleted', propName: 'apiUrl' } }}
+      onSave={onSave} onClose={vi.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Unlink source' }));
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+    expect(onSave.mock.calls[0][1]).toEqual({ title: 'Keep me', dataSource: 'default' });
+  });
+
+  it('ignores a returned source after the editor has moved to a different widget', async () => {
+    const user = userEvent.setup();
+    const openPicker = vi.fn();
+    const onSave = vi.fn();
+    const view = (widgetId: string) => (
+      <SourcePickerProvider value={openPicker}>
+        <WidgetEditPanel widgetId={widgetId} widgetType="source-picker-test" initialData={{ title: widgetId }}
+          sources={[]} onSave={onSave} onClose={vi.fn()} />
+      </SourcePickerProvider>
+    );
+    const { rerender } = render(view('first'));
+    await user.click(screen.getByRole('button', { name: 'Add source' }));
+    const request = openPicker.mock.calls[0][0] as SourcePickRequest;
+    rerender(view('second'));
+    act(() => request.onSelect({ _id: 'late', name: 'Late source', url: 'https://example.edu/late', sourceType: 'api' }));
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+    expect(onSave.mock.calls[0][1]).toEqual({ title: 'second' });
+  });
+
   it('shows one consolidated source section and applies widget-specific unlink state', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
@@ -213,6 +357,32 @@ describe('WidgetEditPanel nested child editor', () => {
     sourceType: 'feed' as const,
   };
 
+  it('adds a child source through the shared host dialog in an empty library', async () => {
+    const user = userEvent.setup();
+    const openPicker = vi.fn();
+    const onSave = vi.fn();
+    render(
+      <SourcePickerProvider value={openPicker}>
+        <WidgetEditPanel widgetId="stack-new" widgetType="nested-container-test"
+          initialData={{ child: { headline: 'Keep headline' } }} sources={[]}
+          onSave={onSave} onClose={vi.fn()} />
+      </SourcePickerProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Edit child' }));
+    await user.click(screen.getByRole('button', { name: 'Add source' }));
+    const request = openPicker.mock.calls[0][0] as SourcePickRequest;
+    expect(request.widgetType).toBe('nested-child-test');
+    act(() => request.onSelect(feedSource));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    expect(onSave.mock.calls[0][1]).toEqual({ child: {
+      headline: 'Keep headline', feedUrl: feedSource.url,
+      __sourceRef: { sourceId: feedSource._id, propName: 'feedUrl' },
+    } });
+  });
+
   it('drills into the child with its schema form and data sources, and applies edits back', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
@@ -280,3 +450,4 @@ describe('WidgetEditPanel nested child editor', () => {
     expect(savedData.child).toEqual({ headline: 'Old' });
   });
 });
+

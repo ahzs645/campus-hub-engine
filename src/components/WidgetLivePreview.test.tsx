@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   OptionsPreview,
   registerWidget,
+  useEventsState,
+  useWidgetPreview,
   type WidgetDefinition,
 } from '@firstform/campus-hub-widget-sdk';
 import { WidgetLivePreview } from './WidgetLivePreview';
@@ -30,6 +32,14 @@ function register(
 register('preview-plain', ({ config }) => <div>label is {String(config?.label)}</div>);
 register('web', () => <div>an iframe you did not want</div>);
 register('preview-banner', () => <div>banner body</div>, { defaultW: 12, defaultH: 1 });
+register('preview-source', ({ config }) => {
+  const sample = useWidgetPreview();
+  const state = useEventsState({
+    apiUrl: config?.apiUrl as string | undefined,
+    defaultEvents: [{ id: 'sample', title: 'Sample news' }],
+  });
+  return <div>{sample ? 'Sample mode' : 'Live mode'}: {state.events[0]?.title} · {String(config?.label)}</div>;
+}, { acceptsSources: [{ propName: 'apiUrl', types: ['api'] }] });
 register('preview-throws', () => {
   throw new Error('widget blew up');
 });
@@ -44,13 +54,28 @@ register('preview-with-own', ({ config }) => <div>real {String(config?.label)}</
   ),
 });
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('WidgetLivePreview', () => {
   it('renders the real widget from the live form data', () => {
     render(<WidgetLivePreview widgetType="preview-plain" data={{ label: 'hello' }} />);
 
     expect(screen.getByText(/label is hello/)).toBeInTheDocument();
+  });
+
+  it('previews sample data without requesting a selected source or changing saved configuration', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const data = {
+      apiUrl: 'https://example.edu/news', label: 'Large text',
+      __sourceRef: { sourceId: 'news', propName: 'apiUrl' },
+    };
+    render(<WidgetLivePreview widgetType="preview-source" data={data} />);
+
+    expect(screen.getByText('Sample mode: Sample news · Large text')).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(data.apiUrl).toBe('https://example.edu/news');
+    vi.unstubAllGlobals();
   });
 
   it('gives banner-shaped widgets a short stage so they render near full width', () => {
@@ -103,7 +128,7 @@ describe('WidgetEditPanel preview', () => {
     // The widget still ships an OptionsPreview; the panel's own preview wins.
     expect(screen.queryByText('hand-written mock-up')).not.toBeInTheDocument();
     expect(screen.getByText(/real live/)).toBeInTheDocument();
-    expect(screen.getAllByText('Preview')).toHaveLength(1);
+    expect(screen.getAllByText('Sample preview')).toHaveLength(1);
   });
 
   it('gives a schema-only widget a preview too', () => {
@@ -120,3 +145,4 @@ describe('WidgetEditPanel preview', () => {
     expect(screen.getByText(/label is from schema/)).toBeInTheDocument();
   });
 });
+

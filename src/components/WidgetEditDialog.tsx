@@ -6,10 +6,18 @@ import {
   HostRendersPreviewProvider,
   NestedWidgetEditorProvider,
   SchemaOptionsForm,
+  SourcePickerProvider,
+  applySourceBinding,
+  detachChangedSourceReferences,
   describeCapabilities,
+  getSourceReference,
+  getSourceReferences,
   isVisibilitySignalKey,
-  meetsRequirement,
+  matchSourceToBindings,
   parseVisibilityScalar,
+  removeSourceBinding,
+  useSourceDisabledReason,
+  useSourcePicker,
 } from '@firstform/campus-hub-widget-sdk';
 import { WidgetLivePreview } from './WidgetLivePreview';
 import type { EngineTheme } from '../lib/ThemeContext';
@@ -19,6 +27,8 @@ import type {
   SimpleVisibilityCondition,
   SourceBinding,
   SourceCapabilities,
+  SourcePickRequest,
+  SourceReference,
 } from '@firstform/campus-hub-widget-sdk';
 
 /**
@@ -29,6 +39,7 @@ import type {
 const SCROLL_BODY_STYLE: React.CSSProperties = { scrollbarGutter: 'stable' };
 
 export interface ContentSource {
+  pushEnabled?: boolean;
   _id: string;
   presetId?: string;
   name: string;
@@ -143,6 +154,16 @@ function WidgetEditForm({
     initialVisibilityCondition?.autoHideSeconds ?? 15,
   );
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const hostSourcePicker = useSourcePicker();
+  // Native modal dialogs make DOM outside their top layer inert. Forward the
+  // dialog element for every plugin picker, including nested/additional-source
+  // controls, so the host can place its shared overlay inside that layer.
+  const openDialogSourcePicker = useCallback((request: SourcePickRequest) => {
+    hostSourcePicker?.({
+      ...request,
+      portalContainer: request.portalContainer ?? dialogRef.current ?? undefined,
+    });
+  }, [hostSourcePicker]);
 
   // Drill-in editor for a child of a container widget (Widget Stack). The
   // container's options UI asks for it through the SDK's nested-editor
@@ -211,6 +232,14 @@ function WidgetEditForm({
   const handleChange = useCallback((newData: Record<string, unknown>) => {
     setData(newData);
   }, []);
+
+  const handleOptionsChange = useCallback((newData: Record<string, unknown>) => {
+    setData((current) => detachChangedSourceReferences(current, newData, widgetDef?.acceptsSources));
+  }, [widgetDef]);
+
+  const handleNestedOptionsChange = useCallback((newData: Record<string, unknown>) => {
+    setNestedData((current) => detachChangedSourceReferences(current, newData, nestedDef?.acceptsSources));
+  }, [nestedDef]);
 
   const openNestedEditor = useCallback((request: NestedWidgetEditRequest) => {
     // An unregistered child type has nothing to edit; leave the container's
@@ -513,11 +542,13 @@ function WidgetEditForm({
           )}
         </div>
 
-        {/* Source Picker — shown when sources are available and widget accepts them */}
-        {sources && sources.length > 0 && widgetDef.acceptsSources && widgetDef.acceptsSources.length > 0 && (
+        {/* The first source can be added here, even in an empty workspace. */}
+        {widgetDef.acceptsSources && widgetDef.acceptsSources.length > 0 && (
           <SourcePicker
+            key={`${widgetId}:${widgetType}`}
+            widgetType={widgetType}
             bindings={widgetDef.acceptsSources}
-            sources={sources}
+            sources={sources ?? []}
             data={data}
             onChange={handleChange}
             onViewSource={onViewSource}
@@ -530,9 +561,9 @@ function WidgetEditForm({
         <HostRendersPreviewProvider>
           <NestedWidgetEditorProvider value={openNestedEditor}>
             {OptionsComponent ? (
-              <OptionsComponent data={data} onChange={handleChange} linkedSource={linkedSource} />
+              <OptionsComponent data={data} onChange={handleOptionsChange} linkedSource={linkedSource} />
             ) : optionsSchema && optionsSchema.length > 0 ? (
-              <SchemaOptionsForm schema={optionsSchema} data={data} onChange={handleChange} />
+              <SchemaOptionsForm schema={optionsSchema} data={data} onChange={handleOptionsChange} />
             ) : (
               <div className="text-center py-8 text-[var(--ui-text-muted)]">
                 <p>No additional configuration options available for this widget.</p>
@@ -554,10 +585,12 @@ function WidgetEditForm({
           than drilling in without end. */}
       {nestedEdit && nestedDef && (
         <div className={scrollBodyClassName} style={SCROLL_BODY_STYLE}>
-          {sources && sources.length > 0 && nestedDef.acceptsSources && nestedDef.acceptsSources.length > 0 && (
+          {nestedDef.acceptsSources && nestedDef.acceptsSources.length > 0 && (
             <SourcePicker
+              key={`${widgetId}:nested:${nestedEdit.widgetType}:${nestedEdit.context ?? ''}`}
+              widgetType={nestedEdit.widgetType}
               bindings={nestedDef.acceptsSources}
-              sources={sources}
+              sources={sources ?? []}
               data={nestedData}
               onChange={setNestedData}
               onViewSource={onViewSource}
@@ -568,14 +601,14 @@ function WidgetEditForm({
             {NestedOptionsComponent ? (
               <NestedOptionsComponent
                 data={nestedData}
-                onChange={setNestedData}
+                onChange={handleNestedOptionsChange}
                 linkedSource={nestedLinkedSource}
               />
             ) : nestedDef.optionsSchema && nestedDef.optionsSchema.length > 0 ? (
               <SchemaOptionsForm
                 schema={nestedDef.optionsSchema}
                 data={nestedData}
-                onChange={setNestedData}
+                onChange={handleNestedOptionsChange}
               />
             ) : (
               <div className="text-center py-8 text-[var(--ui-text-muted)]">
@@ -638,88 +671,140 @@ function WidgetEditForm({
       className="backdrop:bg-black/50 bg-transparent fixed inset-0 m-0 p-4 w-full h-full max-w-none max-h-none flex items-center justify-center"
       onClick={handleBackdropClick}
     >
-      {content}
+      <SourcePickerProvider value={hostSourcePicker ? openDialogSourcePicker : null}>
+        {content}
+      </SourcePickerProvider>
     </dialog>
   );
 }
 
-/** Source picker panel shown above widget options when sources are available */
+/** One source workflow for every widget, including the first source and nested widgets. */
 function SourcePicker({
+  widgetType,
   bindings,
   sources,
   data,
   onChange,
   onViewSource,
 }: {
+  widgetType: string;
   bindings: SourceBinding[];
   sources: ContentSource[];
   data: Record<string, unknown>;
   onChange: (newData: Record<string, unknown>) => void;
   onViewSource?: (sourceId: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const openSourcePicker = useSourcePicker();
+  const getSourceDisabledReason = useSourceDisabledReason();
+  const [expanded, setExpanded] = useState(() => !getSourceReference(data) && sources.every((source) => {
+    const match = matchSourceToBindings(source as LinkedSource, bindings);
+    return !match?.compatible || Boolean(getSourceDisabledReason?.(source as LinkedSource, match.binding));
+  }));
+  const [selectedSources, setSelectedSources] = useState<LinkedSource[]>([]);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
+  const currentData = useRef(data);
+  currentData.current = data;
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+
+  // The newly created source can be selected immediately, before the host's
+  // live source-list query has delivered its next snapshot.
+  const availableSources = [...sources, ...selectedSources.filter((selected) =>
+    !sources.some((source) => source._id === selected._id),
+  )];
+  useEffect(() => {
+    if (selectedSources.some((selected) => sources.some((source) => source._id === selected._id))) {
+      setSelectedSources((current) => current.filter((selected) => !sources.some((source) => source._id === selected._id)));
+    }
+  }, [sources, selectedSources]);
 
   // Get current source ref if any
-  const sourceRef = data.__sourceRef as { sourceId?: string; propName?: string } | undefined;
+  const sourceRef = getSourceReference(data);
+  const sourceRefs = getSourceReferences(data);
   const linkedSource = sourceRef?.sourceId
-    ? sources.find((s) => s._id === sourceRef.sourceId)
+    ? availableSources.find((s) => s._id === sourceRef.sourceId)
     : undefined;
-  const linkedBinding = sourceRef?.propName
-    ? bindings.find((binding) => binding.propName === sourceRef.propName)
-    : undefined;
-  const linkedCapabilityChips = linkedSource?.capabilities
-    ? describeCapabilities(linkedSource.capabilities)
-    : [];
+  const hasCustomSource = !sourceRef && bindings.some((binding) => {
+    const value = data[binding.propName];
+    return binding.mode !== 'reference' && (
+      typeof value === 'string' ? value.trim().length > 0 : Array.isArray(value) && value.length > 0
+    );
+  });
 
   const handlePickSource = (binding: SourceBinding, source: ContentSource) => {
-    const mappedData = binding.applySource
-      ? binding.applySource(source as any, data)
-      : binding.mode === 'reference' ? {} : { [binding.propName]: source.url };
-    const newData = {
-      ...data,
-      ...mappedData,
-      __sourceRef: { sourceId: source._id, propName: binding.propName, ...(binding.mode === 'reference' ? { mode: 'reference' } : {}) },
-    };
-    onChange(newData);
+    if (!mounted.current) return;
+    const match = matchSourceToBindings(source as LinkedSource, [binding]);
+    const disabledReason = match && getSourceDisabledReason?.(source as LinkedSource, match.binding);
+    if (!match?.compatible || disabledReason) {
+      setSelectionError(disabledReason ?? match?.reason ?? 'This source is not supported by this widget.');
+      return;
+    }
+    const previousRef = getSourceReference(currentData.current);
+    const previousBinding = bindings.find((candidate) => candidate.propName === previousRef?.propName);
+    try {
+      const next = applySourceBinding(source as LinkedSource, binding, currentData.current, previousBinding);
+      currentData.current = next;
+      onChange(next);
+    } catch (error) {
+      setSelectionError(error instanceof Error ? error.message : 'This source could not be linked.');
+      return;
+    }
+    setSelectedSources((current) => [...current.filter((entry) => entry._id !== source._id), source as LinkedSource]);
+    setSelectionError(null);
     setExpanded(false);
   };
 
-  const handleUnlink = () => {
-    const { __sourceRef, ...rest } = data;
-    const mappedData = linkedBinding?.removeSource
-      ? linkedBinding.removeSource(rest)
-      : {};
-    onChange({ ...rest, ...mappedData });
-    setExpanded(false);
+  const handleUnlink = (reference: SourceReference) => {
+    const binding = reference.propName
+      ? bindings.find((entry) => entry.propName === reference.propName)
+      : bindings.length === 1 ? bindings[0] : undefined;
+    const next = removeSourceBinding(currentData.current, binding, reference);
+    currentData.current = next;
+    onChange(next);
+    setSelectionError(null);
+    setExpanded(true);
+  };
+
+  const openPicker = (initialTab: 'library' | 'store' | 'create') => {
+    setSelectionError(null);
+    openSourcePicker?.({
+      widgetType,
+      bindings,
+      initialTab,
+      onSelect: (source) => {
+        if (!mounted.current) return;
+        const match = matchSourceToBindings(source, bindings);
+        if (!match?.compatible) {
+          setSelectionError(match?.reason ?? 'This source is not supported by this widget.');
+          return;
+        }
+        handlePickSource(match.binding, source);
+      },
+    });
   };
 
   // Resolve, for each accepted source, its binding + whether it satisfies the
   // binding's capability requirement. Sources that don't meet `requires` are
   // still shown (greyed, with a reason) rather than hidden, so the choice stays
   // legible — capabilities can be stale or unknown.
-  const findBinding = (source: ContentSource) =>
-    bindings.find((binding) =>
-      binding.types.includes(source.sourceType as any) &&
-      (!binding.matchSource || binding.matchSource(source as any))
-    );
-
   type PickerEntry = { source: ContentSource; binding: SourceBinding; meets: boolean; reason?: string };
   const matchingSources: PickerEntry[] = [];
-  for (const source of sources) {
-    const binding = findBinding(source);
-    if (!binding) continue;
-    const requirement = meetsRequirement(source.capabilities, binding.requires);
-    matchingSources.push({ source, binding, meets: requirement.ok, reason: requirement.reason });
+  for (const source of availableSources) {
+    const match = matchSourceToBindings(source as LinkedSource, bindings);
+    if (!match) continue;
+    const disabledReason = getSourceDisabledReason?.(source as LinkedSource, match.binding);
+    matchingSources.push({ source, binding: match.binding, meets: match.compatible && !disabledReason, reason: disabledReason ?? match.reason });
   }
   // Sources that meet requirements float to the top.
   matchingSources.sort((a, b) => Number(b.meets) - Number(a.meets));
-  const pickerSources = linkedSource
-    ? matchingSources.filter(({ source }) => source._id !== linkedSource._id)
-    : matchingSources;
+  const pickerSources = matchingSources.filter(({ source, binding }) =>
+    !sourceRefs.some((ref) => ref.sourceId === source._id && ref.propName === binding.propName),
+  );
 
   const hint = bindings.find((b) => b.capabilityHint)?.capabilityHint;
-
-  if (matchingSources.length === 0) return null;
 
   return (
     <div className="rounded-lg overflow-hidden border border-[color:var(--ui-item-border)] bg-[var(--ui-item-bg)]">
@@ -743,8 +828,23 @@ function SourcePicker({
         </svg>
       </button>
 
-      {linkedSource && (
-        <div className="border-t border-[color:var(--ui-item-border)] px-3 py-3">
+      {selectionError && <p role="alert" className="px-4 pb-3 text-xs text-red-600 dark:text-red-400">{selectionError}</p>}
+
+      {sourceRefs.map((reference) => {
+        const linkedSource = availableSources.find((source) => source._id === reference.sourceId);
+        const linkedBinding = reference.propName
+          ? bindings.find((binding) => binding.propName === reference.propName)
+          : bindings.length === 1 ? bindings[0] : undefined;
+        const linkedCapabilityChips = linkedSource?.capabilities ? describeCapabilities(linkedSource.capabilities) : [];
+        const key = `${reference.sourceId}:${reference.propName ?? ''}:${reference.itemId ?? ''}`;
+        if (!linkedSource) return (
+          <div key={key} className="border-t border-[color:var(--ui-item-border)] px-4 py-3">
+            <p className="text-xs text-amber-600 dark:text-amber-400">The linked source is unavailable. Choose another source or unlink it to use sample data.</p>
+            <button type="button" onClick={() => handleUnlink(reference)} className="mt-2 text-xs font-medium text-[var(--color-accent)]">Unlink source</button>
+          </div>
+        );
+        return (
+        <div key={key} className="border-t border-[color:var(--ui-item-border)] px-3 py-3">
           <div className="rounded-lg border border-[color:var(--ui-accent-soft)] bg-[var(--ui-accent-soft)] p-3">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
@@ -753,10 +853,10 @@ function SourcePicker({
                 <div className="truncate text-xs text-[var(--ui-text-muted)]">{linkedSource.url}</div>
               </div>
               <div className="flex flex-shrink-0 items-center gap-1">
-                {onViewSource && sourceRef?.sourceId && (
+                {onViewSource && (
                   <button
                     type="button"
-                    onClick={() => onViewSource(sourceRef.sourceId!)}
+                    onClick={() => onViewSource(reference.sourceId)}
                     className="rounded px-2 py-1 text-xs font-medium text-[var(--color-accent)] transition-colors hover:bg-[var(--ui-item-hover)]"
                   >
                     View source
@@ -764,7 +864,8 @@ function SourcePicker({
                 )}
                 <button
                   type="button"
-                  onClick={handleUnlink}
+                  onClick={() => handleUnlink(reference)}
+                  aria-label={sourceRefs.length > 1 ? `Unlink ${linkedSource.name}` : undefined}
                   className="rounded px-2 py-1 text-xs font-medium text-[var(--ui-text-muted)] transition-colors hover:bg-[var(--ui-item-hover)] hover:text-[var(--ui-text)]"
                 >
                   {linkedBinding?.unlinkLabel ?? 'Unlink'}
@@ -788,7 +889,8 @@ function SourcePicker({
             )}
           </div>
         </div>
-      )}
+        );
+      })}
 
       {expanded && (
         <div className="px-4 pb-4 space-y-2 border-t border-[color:var(--ui-item-border)] pt-3">
@@ -797,6 +899,16 @@ function SourcePicker({
               ? 'Choose a saved source. Changes to its data update this widget.'
               : 'Pick a source from your library to link to this widget. The URL will stay in sync when you update the source.'}
           </p>
+          {!sourceRef && !hasCustomSource && (
+            <p className="text-xs text-[var(--ui-text-muted)]">
+              Sample data is shown until you choose a source. No connection is needed to try the widget.
+            </p>
+          )}
+          {hasCustomSource && (
+            <p className="text-xs text-[var(--ui-text-muted)]">
+              This widget uses a custom source. Choose a saved source to manage the connection from Sources.
+            </p>
+          )}
           {hint && (
             <p className="text-xs text-[var(--color-accent)] mb-2">{hint}</p>
           )}
@@ -807,10 +919,12 @@ function SourcePicker({
               return (
                 <button
                   key={source._id}
+                  type="button"
                   onClick={() => handlePickSource(binding, source)}
+                  disabled={!meets}
                   title={!meets && reason ? reason : undefined}
                   className={`w-full text-left p-2 rounded-lg flex items-start gap-3 transition-colors ${
-                    !meets ? 'opacity-60' : ''
+                    !meets ? 'cursor-not-allowed opacity-60' : ''
                   } hover:bg-[var(--ui-item-hover)]`}
                 >
                   <div className="w-8 h-8 mt-0.5 rounded flex items-center justify-center flex-shrink-0 overflow-hidden bg-[var(--ui-item-bg)]">
@@ -848,11 +962,25 @@ function SourcePicker({
               );
             })}
             {pickerSources.length === 0 && (
-              <div className="py-2 text-xs text-[var(--ui-text-muted)]">No other compatible sources available.</div>
+              <div className="py-2 text-xs text-[var(--ui-text-muted)]">
+                {linkedSource ? 'No other compatible sources available.' : 'No compatible sources saved yet.'}
+              </div>
             )}
           </div>
+        </div>
+      )}
+
+      {openSourcePicker && (
+        <div className="flex flex-wrap gap-2 border-t border-[color:var(--ui-item-border)] px-4 py-3">
+          <button type="button" onClick={() => openPicker('store')} className="rounded-lg border border-[color:var(--ui-item-border)] px-3 py-2 text-xs font-medium text-[var(--color-accent)] hover:bg-[var(--ui-item-hover)]">
+            Browse source store
+          </button>
+          <button type="button" onClick={() => openPicker('create')} className="rounded-lg border border-[color:var(--ui-item-border)] px-3 py-2 text-xs font-medium text-[var(--ui-text)] hover:bg-[var(--ui-item-hover)]">
+            Add source
+          </button>
         </div>
       )}
     </div>
   );
 }
+
