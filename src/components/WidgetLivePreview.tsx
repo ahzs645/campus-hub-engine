@@ -10,8 +10,10 @@ import {
 } from 'react';
 import {
   AppIcon,
+  buildWidgetPreviewProps,
   getWidget,
   OptionsPreview,
+  WidgetPreviewProvider,
   type IconName,
 } from '@firstform/campus-hub-widget-sdk';
 import { useEngineTheme, type EngineTheme } from '../lib/ThemeContext';
@@ -28,8 +30,8 @@ import {
  * because a preview would mean loading someone else's page, video or audio
  * stream into a 300px box every time the options form is opened.
  *
- * This list is the editor's own policy and deliberately lives here rather than
- * on each widget: a widget should never have to know it is being previewed.
+ * External playback uses a static card. Data widgets use the SDK sample
+ * preview context below so browsing their appearance does not open a source.
  */
 const STATIC_PREVIEW_TYPES = new Set([
   'canva',
@@ -106,15 +108,15 @@ function PreviewNotice({ icon, children }: { icon: IconName; children: ReactNode
 
 export interface WidgetLivePreviewProps {
   widgetType: string;
-  /** Live form state, so the preview tracks edits as they are made. */
+  /** Form state; presentation edits are retained and live source inputs are removed. */
   data: Record<string, unknown>;
   /** Falls back to the surrounding EngineThemeProvider. */
   theme?: EngineTheme;
 }
 
 /**
- * The editor's one preview: renders the real widget with the options currently
- * in the form, scaled down the way the canvas scales it.
+ * The editor's sample preview: renders the real widget with presentation
+ * options from the form, using local fake data and no live source connection.
  *
  * It replaces the hand-written mock-ups widgets used to carry in their own
  * options UIs — those only ever approximated the widget, drifted from it, and
@@ -158,9 +160,10 @@ export function WidgetLivePreview({ widgetType, data, theme }: WidgetLivePreview
     DISPLAY_REFERENCE_HEIGHT;
 
   const WidgetComponent = widgetDef.component;
+  const previewData = buildWidgetPreviewProps(widgetDef, data);
 
   return (
-    <OptionsPreview>
+    <OptionsPreview title="Sample preview">
       <div ref={frameRef} className="flex w-full justify-center">
         {isStatic ? (
           <PreviewNotice icon={widgetDef.icon}>
@@ -188,7 +191,9 @@ export function WidgetLivePreview({ widgetType, data, theme }: WidgetLivePreview
             >
               <Suspense fallback={null}>
                 <div style={getContentScaleStyle(contentScale)}>
-                  <WidgetComponent config={data} theme={resolvedTheme} />
+                  <WidgetPreviewProvider>
+                    <WidgetComponent config={previewData} theme={resolvedTheme} />
+                  </WidgetPreviewProvider>
                 </div>
               </Suspense>
             </PreviewErrorBoundary>
@@ -200,3 +205,4 @@ export function WidgetLivePreview({ widgetType, data, theme }: WidgetLivePreview
 }
 
 export default WidgetLivePreview;
+
