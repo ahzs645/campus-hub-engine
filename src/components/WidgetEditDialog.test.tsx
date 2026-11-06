@@ -42,6 +42,44 @@ registerWidget({
 });
 
 describe('WidgetEditPanel source picker', () => {
+  it('keeps a picked source when the host re-renders with new but equal initial data', async () => {
+    const user = userEvent.setup();
+    const openPicker = vi.fn();
+    const onSave = vi.fn();
+    // Hosts pass `widget.props || {}`, so a propless widget gets a new object on
+    // every render, including the one caused by the source list updating.
+    const panel = () => (
+      <SourcePickerProvider value={openPicker}>
+        <WidgetEditPanel widgetId="propless" widgetType="source-picker-test" initialData={{}}
+          sources={[]} onSave={onSave} onClose={vi.fn()} />
+      </SourcePickerProvider>
+    );
+    const { rerender } = render(panel());
+    await user.click(screen.getByRole('button', { name: 'Add source' }));
+    act(() => (openPicker.mock.calls[0][0] as SourcePickRequest).onSelect({
+      _id: 'imported', name: 'Imported feed', sourceType: 'api', url: 'https://example.edu/feed',
+    }));
+    rerender(panel());
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+    expect(onSave.mock.calls[0][1]).toMatchObject({
+      apiUrl: 'https://example.edu/feed',
+      __sourceRef: { sourceId: 'imported', propName: 'apiUrl' },
+    });
+  });
+
+  it('resets the form when the host supplies different initial data', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    const panel = (apiUrl: string) => (
+      <WidgetEditPanel widgetId="same" widgetType="source-picker-test" initialData={{ apiUrl }}
+        sources={[]} onSave={onSave} onClose={vi.fn()} />
+    );
+    const { rerender } = render(panel('https://example.edu/old'));
+    rerender(panel('https://example.edu/new'));
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
+    expect(onSave.mock.calls[0][1]).toMatchObject({ apiUrl: 'https://example.edu/new' });
+  });
+
   it('links several sources and unlinks one while keeping manual and other saved slides', async () => {
     const user = userEvent.setup();
     const openPicker = vi.fn();

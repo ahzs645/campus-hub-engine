@@ -191,7 +191,16 @@ function WidgetEditForm({
 
   const isDialog = presentation === 'dialog';
 
-  // Sync initial data when the edited widget changes.
+  // Sync initial data when the edited widget changes. Compare by value: hosts
+  // commonly pass `widget.props || {}`, so identity changes on every parent
+  // render, and a reactive update (such as the source list delivering a just
+  // imported source) would otherwise discard the unsaved form.
+  const initialStateKey = JSON.stringify([
+    widgetId,
+    initialData,
+    initialComingSoon ?? false,
+    initialVisibilityCondition ?? null,
+  ]);
   useEffect(() => {
     setData(initialData);
     setComingSoon(initialComingSoon);
@@ -208,12 +217,8 @@ function WidgetEditForm({
     );
     setAutoHideSeconds(initialVisibilityCondition?.autoHideSeconds ?? 15);
     setNestedEdit(null);
-  }, [
-    widgetId,
-    initialData,
-    initialComingSoon,
-    initialVisibilityCondition,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialStateKey covers these values.
+  }, [initialStateKey]);
 
   // Control dialog open/close
   useEffect(() => {
